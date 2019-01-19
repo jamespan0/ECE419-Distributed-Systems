@@ -1,2 +1,5 @@
 #ignore bin folders
 bin/
+
+#ignore manifest files
+.MF
