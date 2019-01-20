@@ -55,7 +55,7 @@ public class TextMessage implements KVMessage, Serializable {
         }
         
 	@Override public StatusType getStatus() {
-            return NULL;
+            return StatusType.NULL;
         }
 
 	/**
