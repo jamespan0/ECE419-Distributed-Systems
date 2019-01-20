@@ -85,40 +85,42 @@ public class KVClient implements IKVClient, ClientSocketListener {
 			}
 			
 		} else if (tokens[0].equals("put")) {
-			if(tokens.length >= 2) {
-				if(client != null && client.isRunning()){
-					StringBuilder msg = new StringBuilder();
-					for(int i = 1; i < tokens.length; i++) {
-						msg.append(tokens[i]);
-						if (i != tokens.length -1 ) {
-							msg.append(" ");
-						}
-					}	
-					sendMessage(msg.toString());
-				} else {
-					printError("Not connected!");
-				}
-			} else {
-				printError("No message passed!");
-			}
+                        if(tokens.length == 3) {
+                                if(client != null && client.isRunning()){
+                                        StringBuilder msg = new StringBuilder();
+                                        for(int i = 0; i < tokens.length; i++) {
+                                                msg.append(tokens[i]);
+                                                if (i != tokens.length -1 ) {
+                                                        msg.append(" ");
+                                                }
+                                        }	
+                                        sendMessage(msg.toString());
+                                } else {
+                                        printError("Not connected!");
+                                }
+                        } else {
+                                printError("Syntax Error!");
+                                printError("put <key> <value>");
+                        }
 			
 		} else if (tokens[0].equals("get")) {
-			if(tokens.length >= 2) {
-				if(client != null && client.isRunning()){
-					StringBuilder msg = new StringBuilder();
-					for(int i = 1; i < tokens.length; i++) {
-						msg.append(tokens[i]);
-						if (i != tokens.length -1 ) {
-							msg.append(" ");
-						}
-					}	
-					sendMessage(msg.toString());
-				} else {
-					printError("Not connected!");
-				}
-			} else {
-				printError("No message passed!");
-			}
+                        if(tokens.length == 2) {
+                                if(client != null && client.isRunning()){
+                                        StringBuilder msg = new StringBuilder();
+                                        for(int i = 0; i < tokens.length; i++) {
+                                                msg.append(tokens[i]);
+                                                if (i != tokens.length -1 ) {
+                                                        msg.append(" ");
+                                                }
+                                        }	
+                                        sendMessage(msg.toString());
+                                } else {
+                                        printError("Not connected!");
+                                }
+                        } else {
+                                printError("Syntax Error!");
+                                printError("get <key>");
+                        }
 			
 		} else if(tokens[0].equals("disconnect")) {
 			disconnect();
@@ -222,7 +224,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
 	
 	public void handleNewMessage(TextMessage msg) {
 		if(!stop) {
-			System.out.println(msg.getMsg());
+			System.out.println("\rServer Reply: " + msg.getMsg());
 			System.out.print(PROMPT);
 		}
 	}
