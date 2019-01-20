@@ -3,3 +3,5 @@ bin/
 
 #ignore manifest files
 .MF
+/nbproject/private/
+/build/
