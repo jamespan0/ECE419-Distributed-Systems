@@ -14,23 +14,23 @@ public class TextMessage implements KVMessage, Serializable {
         private static final char LINE_FEED = 0x0A;
         private static final char RETURN = 0x0D;
 
-    /**
-     * Constructs a TextMessage object with a given array of bytes that 
-     * forms the message.
-     * 
-     * @param bytes the bytes that form the message in ASCII coding.
-     */
+        /**
+         * Constructs a TextMessage object with a given array of bytes that 
+         * forms the message.
+         * 
+         * @param bytes the bytes that form the message in ASCII coding.
+         */
         public TextMessage(byte[] bytes) {
                 this.msgBytes = addCtrChars(bytes);
                 this.msg = new String(msgBytes).trim();
         }
 
         /**
-     * Constructs a TextMessage object with a given String that
-     * forms the message. 
-     * 
-     * @param msg the String that forms the message.
-     */
+        * Constructs a TextMessage object with a given String that
+        * forms the message. 
+        * 
+        * @param msg the String that forms the message.
+        */
         public TextMessage(String msg) {
                 this.msg = msg;
                 this.msgBytes = toByteArray(msg);
@@ -42,20 +42,76 @@ public class TextMessage implements KVMessage, Serializable {
          * 
          * @return the content of this message in String format.
          */
+        // Full Message
         public String getMsg() {
                 return msg.trim();
         }
 
         @Override public String getKey() {
-            return "";
+            
+            String[] tokens = getMsg().split("\\s+");
+            
+            // should not have more than 3 parameters
+            if (tokens.length > 3) {
+                return null;
+            }
+            
+            if (tokens.length == 2 || tokens.length == 3) {
+                // it's either PUT <key> <value>
+                // or <STATUS> <key> (<value>)
+                // or GET <key>
+                return tokens[1];
+            }
+            
+            // tokens.length < 2
+            // eg. STATUS(error)
+            
+            return null;
         }
 
         @Override public String getValue() {
-            return "";
+            
+            String[] tokens = getMsg().split("\\s+");
+            
+            // should not have more than 3 parameters
+            if (tokens.length > 3) {
+                return null;
+            }
+            
+            if (tokens.length == 2 || tokens.length == 3) {
+                // it's either PUT <key> <value>
+                // or <STATUS> <key> (<value>)
+                // or GET <key>
+                return tokens[1];
+            }
+            
+            // tokens.length < 2
+            // eg. STATUS(error)
+            
+            return null;
         }
 
         @Override public StatusType getStatus() {
-            return StatusType.NULL;
+            
+            String[] tokens = getMsg().split("\\s+");
+            
+            // should not have more than 3 parameters
+            if (tokens.length > 3) {
+                return null;
+            }
+            
+            if (tokens.length > 0) {
+                String status_str = tokens[0];
+                try {
+                    return StatusType.valueOf(status_str);
+                    
+                } catch (IllegalArgumentException e) {
+                    // No match of the status type is found in the enum block.
+                    return null;
+                }
+            }
+            
+            return null;
         }
 
         /**
