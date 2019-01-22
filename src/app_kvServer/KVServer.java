@@ -3,13 +3,19 @@ package app_kvServer;
 import java.net.BindException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.io.IOException;
 import java.util.HashMap;
 
-//import logging.LogSetup;
+import logger.LogSetup;
 
-import org.apache.log4j.Level;
-import org.apache.log4j.Logger;
+import org.apache.log4j.*;
+
+import client.KVCommInterface;
+import client.KVStore;
+
+import shared.messages.TextMessage;
 
 public class KVServer implements IKVServer {
 	/**
@@ -23,7 +29,12 @@ public class KVServer implements IKVServer {
 	 *           and "LFU".
 	 */
 
-    // private variables for getters 
+    // private variables 
+	private static Logger logger = Logger.getRootLogger();
+    private ServerSocket serverSocket;
+
+	private boolean running = false;
+
     private int port;
     private int cacheSize;
     private IKVServer.CacheStrategy cacheStrategy;
@@ -60,26 +71,36 @@ public class KVServer implements IKVServer {
 	
 	@Override
 	public int getPort(){
-		// TODO Auto-generated method stub
 		return this.port;
 	}
 
 	@Override
     public String getHostname(){
-		// TODO Auto-generated method stub
-		return null;
+        InetAddress ip;
+        String hostname;
+        try {
+            ip = InetAddress.getLocalHost();
+            hostname = ip.getHostName();
+
+			return hostname;
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+	        
+			logger.error("Error! " +
+	  			"Unknown Host!. \n", e);
+		
+			return "Unknown Host";
+        }
 	}
 
 	@Override
     public CacheStrategy getCacheStrategy(){
-		// TODO Auto-generated method stub
 		return this.cacheStrategy;
 	}
 
 	@Override
     public int getCacheSize(){
-		// TODO Auto-generated method stub
-		return -1;
+		return this.cacheSize;
 	}
 
 	@Override
@@ -101,14 +122,13 @@ public class KVServer implements IKVServer {
 
 	@Override
     public boolean inCache(String key){
-		// TODO Auto-generated method stub
         /*
             --> subpart of inStorage, check in 
         */
         // Constraint checking for key and value
         /*
-        if (key.getBytes("UTF-8").length > 20) {
-            return false; //ERROR due to key length too long
+        	if (key.getBytes("UTF-8").length > 20) {
+            	return false; //ERROR due to key length too long
         }
         */
 
@@ -116,9 +136,7 @@ public class KVServer implements IKVServer {
 	}
 
 	@Override
-    public String getKV(String key) throws Exception{
-		// TODO Auto-generated method stub
-        
+    public String getKV(String key) throws Exception{        
         /*
             strategy:
             1) search cache first for key value pair: if not found
@@ -130,12 +148,11 @@ public class KVServer implements IKVServer {
         }
 
 
-		return "";
+		return "test";
 	}
 
 	@Override
     public void putKV(String key, String value) throws Exception{
-		// TODO Auto-generated method stub
         /*
             strategy:
             1) use map to store data structure
@@ -173,9 +190,44 @@ public class KVServer implements IKVServer {
 		// TODO Auto-generated method stub
 	}
 
+    private boolean initializeServer() {
+    	logger.info("Initializing server...");
+    	try {
+            serverSocket = new ServerSocket(port);
+            logger.info("Server listening on port: " 
+            		+ serverSocket.getLocalPort());    
+            return true;
+        } catch (IOException e) {
+        	logger.error("Error! Cannot open server socket:");
+            if(e instanceof BindException){
+            	logger.error("Port " + port + " is already bound!");
+            }
+            return false;
+        }
+    }
+
 	@Override
     public void run(){
-		// TODO Auto-generated method stub
+    	running = initializeServer();
+
+        if(serverSocket != null) {
+	        while(this.running){
+	            try {
+	                Socket client = serverSocket.accept();                
+	                ClientConnection connection = 
+	                		new ClientConnection(this, client);
+	                new Thread(connection).start();
+	                
+	                logger.info("Connected to " 
+	                		+ client.getInetAddress().getHostName() 
+	                		+  " on port " + client.getPort());
+	            } catch (IOException e) {
+	            	logger.error("Error! " +
+	            			"Unable to establish connection. \n", e);
+	            }
+	        }
+        }
+        logger.info("Server stopped.");
 	}
 
 	@Override
@@ -185,6 +237,43 @@ public class KVServer implements IKVServer {
 
 	@Override
     public void close(){
-		// TODO Auto-generated method stub
+        running = false;
+        try {
+			serverSocket.close();
+		} catch (IOException e) {
+			logger.error("Error! " +
+					"Unable to close socket on port: " + port, e);
+		}
 	}
+
+    /**
+     * Main entry point for the server application. 
+     * @param args contains the port number at args[0], cachesize at args[1], strategy at args[2].
+     */
+    public static void main(String[] args) {
+    	try {
+			new LogSetup("logs/server.log", Level.ALL);
+			if(args.length != 3) {
+				System.out.println("Error! Invalid number of arguments!");
+				System.out.println("Usage: Server <port> <cache size> <cache strategy>!");
+			} else {
+				int port = Integer.parseInt(args[0]);
+				int cacheSize = Integer.parseInt(args[1]);
+				String cacheStrategy = args[2];
+				KVServer app = new KVServer(port, cacheSize, cacheStrategy);
+				app.run();
+				app.getHostname();
+
+				app.close();
+			}
+		} catch (IOException e) {
+			System.out.println("Error! Unable to initialize logger!");
+			e.printStackTrace();
+			System.exit(1);
+		} catch (NumberFormatException nfe) {
+			System.out.println("Error! Invalid argument(s)!");
+			System.out.println("Usage: Server <port> <cache size> <cache strategy>!");
+			System.exit(1);
+		}
+    }
 }
