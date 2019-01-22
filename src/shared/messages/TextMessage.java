@@ -113,6 +113,23 @@ public class TextMessage implements KVMessage, Serializable {
             
             return null;
         }
+        
+        public int isValid() {
+            
+            // must have a status
+            StatusType status = getStatus();
+            if (status == null) {
+                return 0;
+            }
+            
+            // must have a key and value if status valid
+            if (status == StatusType.GET_SUCCESS || status == StatusType.PUT_SUCCESS || status == StatusType.PUT_UPDATE || status == StatusType.DELETE_SUCCESS) {
+                if (getKey() == null || getValue() == null) return 0;
+                return 1;
+            }
+            
+            return 1;
+        }
 
         /**
          * Returns an array of bytes that represent the ASCII coded message content.
