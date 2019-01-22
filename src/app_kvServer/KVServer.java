@@ -37,7 +37,7 @@ public class KVServer implements IKVServer {
 
 	private int port;
 	private int cacheSize;
-	private IKVServer.CacheStrategy cacheStrategy;
+	private CacheStrategy cacheStrategy;
 
 
 	/*     START OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
@@ -53,16 +53,16 @@ public class KVServer implements IKVServer {
 		this.cacheSize = cacheSize;
 		disk_storage = new HashMap<String, String>(); //disk KVstorage
 		if (strategy.equals("FIFO")) {
-			this.cacheStrategy = IKVServer.CacheStrategy.FIFO;
+			this.cacheStrategy = CacheStrategy.FIFO;
 		}
 		else if (strategy.equals("LFU")) {
-			this.cacheStrategy = IKVServer.CacheStrategy.LFU;
+			this.cacheStrategy = CacheStrategy.LFU;
 		}
 		else if (strategy.equals("LRU")) {
-			this.cacheStrategy = IKVServer.CacheStrategy.LRU;
+			this.cacheStrategy = CacheStrategy.LRU;
 		}
 		else {
-			this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
+			this.cacheStrategy = CacheStrategy.FIFO; //in case of fail, just do FIFO operation
 		}
         
 	}
@@ -104,7 +104,6 @@ public class KVServer implements IKVServer {
 
 	@Override
 	public boolean inStorage(String key){
-		// TODO Auto-generated method stub
         /*
             1) run incache
             2) then check if it is in cache
@@ -227,12 +226,20 @@ public class KVServer implements IKVServer {
 	}
 
 	@Override
-	public void kill(){
-
+	public void kill(){	
+		running = false;
+		try {
+			serverSocket.close();
+		} catch (IOException e) {
+			logger.error("Error! " +
+					"Unable to close socket on port: " + port, e);
+		}
 	}
 
 	@Override
 	public void close(){
+		//add actions to free data structures, cache, etc
+
 		running = false;
 		try {
 			serverSocket.close();
@@ -258,9 +265,6 @@ public class KVServer implements IKVServer {
 				String cacheStrategy = args[2];
 				KVServer app = new KVServer(port, cacheSize, cacheStrategy);
 				app.run();
-				app.getHostname();
-
-				app.close();
 			}
 		} catch (IOException e) {
 			System.out.println("Error! Unable to initialize logger!");
