@@ -29,42 +29,41 @@ public class KVServer implements IKVServer {
 	 *           and "LFU".
 	 */
 
-    // private variables 
+	// private variables 
 	private static Logger logger = Logger.getRootLogger();
-    private ServerSocket serverSocket;
+	private ServerSocket serverSocket;
 
 	private boolean running = false;
 
-    private int port;
-    private int cacheSize;
-    private IKVServer.CacheStrategy cacheStrategy;
+	private int port;
+	private int cacheSize;
+	private IKVServer.CacheStrategy cacheStrategy;
 
 
-    /*     START OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
-    private HashMap<String, String> disk_storage;     //data structure for disk storage
-    private HashMap<String, String> cache_LRU;     //data structure for cache_LRU case
-    private HashMap<String, String> cache_LFU;     //data structure for cache_LFU case
-    private HashMap<String, String> cache_FIFO;     //data structure for cache_FIFO case
-    /*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
+	/*     START OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
+	private HashMap<String, String> disk_storage;     //data structure for disk storage
+	private HashMap<String, String> cache_LRU;     //data structure for cache_LRU case
+	private HashMap<String, String> cache_LFU;     //data structure for cache_LFU case
+	private HashMap<String, String> cache_FIFO;     //data structure for cache_FIFO case
+	/*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
 
 
 	public KVServer(int port, int cacheSize, String strategy) {
-		// TODO Auto-generated method stub
-        this.port = port;
-        this.cacheSize = cacheSize;
-        disk_storage = new HashMap<String, String>(); //disk KVstorage
-        if (strategy.equals("FIFO")) {
-            this.cacheStrategy = IKVServer.CacheStrategy.FIFO;
-        }
-        else if (strategy.equals("LFU")) {
-            this.cacheStrategy = IKVServer.CacheStrategy.LFU;
-        }
-        else if (strategy.equals("LRU")) {
-            this.cacheStrategy = IKVServer.CacheStrategy.LRU;
-        }
-        else {
-            this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
-        }
+		this.port = port;
+		this.cacheSize = cacheSize;
+		disk_storage = new HashMap<String, String>(); //disk KVstorage
+		if (strategy.equals("FIFO")) {
+			this.cacheStrategy = IKVServer.CacheStrategy.FIFO;
+		}
+		else if (strategy.equals("LFU")) {
+			this.cacheStrategy = IKVServer.CacheStrategy.LFU;
+		}
+		else if (strategy.equals("LRU")) {
+			this.cacheStrategy = IKVServer.CacheStrategy.LRU;
+		}
+		else {
+			this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
+		}
         
 	}
     
@@ -74,37 +73,37 @@ public class KVServer implements IKVServer {
 		return this.port;
 	}
 
-	@Override
-    public String getHostname(){
-        InetAddress ip;
-        String hostname;
-        try {
-            ip = InetAddress.getLocalHost();
-            hostname = ip.getHostName();
+	@Override	
+	public String getHostname(){
+		InetAddress ip;
+		String hostname;
+		try {
+			ip = InetAddress.getLocalHost();
+			hostname = ip.getHostName();
 
 			return hostname;
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
 	        
 			logger.error("Error! " +
-	  			"Unknown Host!. \n", e);
+				"Unknown Host!. \n", e);
 		
 			return "Unknown Host";
-        }
+		}
 	}
 
 	@Override
-    public CacheStrategy getCacheStrategy(){
+	public CacheStrategy getCacheStrategy(){
 		return this.cacheStrategy;
 	}
 
 	@Override
-    public int getCacheSize(){
+	public int getCacheSize(){
 		return this.cacheSize;
 	}
 
 	@Override
-    public boolean inStorage(String key){
+	public boolean inStorage(String key){
 		// TODO Auto-generated method stub
         /*
             1) run incache
@@ -121,7 +120,7 @@ public class KVServer implements IKVServer {
 	}
 
 	@Override
-    public boolean inCache(String key){
+	public boolean inCache(String key){
         /*
             --> subpart of inStorage, check in 
         */
@@ -136,109 +135,106 @@ public class KVServer implements IKVServer {
 	}
 
 	@Override
-    public String getKV(String key) throws Exception{        
+	public String getKV(String key) throws Exception{        
         /*
             strategy:
             1) search cache first for key value pair: if not found
             2) search full list of memory for key value pair
         */
         // Constraint checking for key and value
-        if (key.getBytes("UTF-8").length > 20) {
-            return "ERROR"; //ERROR due to key length too long
-        }
-
+		if (key.getBytes("UTF-8").length > 20) {
+			return "ERROR"; //ERROR due to key length too long
+		}
 
 		return "test";
 	}
 
 	@Override
-    public void putKV(String key, String value) throws Exception{
+	public void putKV(String key, String value) throws Exception{
         /*
             strategy:
             1) use map to store data structure
         */
         // Constraint checking for key and value
-        if (key.getBytes("UTF-8").length > 20) {
-            return; //ERROR due to key length too long
-        }
+		if (key.getBytes("UTF-8").length > 20) {
+			return; //ERROR due to key length too long
+		}
 
-        //120kB is around 122880 bytes
-        if (value.getBytes("UTF-8").length > 122880) {
-            return; //ERROR due to value length too long
-        }
+		//120kB is around 122880 bytes
+		if (value.getBytes("UTF-8").length > 122880) {
+			return; //ERROR due to value length too long
+		}
 
-        // if value is null, delete the key
-        if (value == null) {
-            if (disk_storage.containsKey(key)) {
-                disk_storage.remove(key); //remove key if exists
-                return;
-            }
-        }
-        //else replace
-        disk_storage.put(key,value);
+		// if value is null, delete the key
+		if (value == null) {
+			if (disk_storage.containsKey(key)) {
+				disk_storage.remove(key); //remove key if exists
+				return;
+			}
+		}
+		//else replace
+		disk_storage.put(key,value);
+	}
 
+	@Override
+	public void clearCache(){
 
 	}
 
 	@Override
-    public void clearCache(){
-		// TODO Auto-generated method stub
+	public void clearStorage(){
+
+	}
+
+	private boolean initializeServer() {
+		logger.info("Initializing server...");
+		try {
+			serverSocket = new ServerSocket(port);
+			logger.info("Server listening on port: " 
+					+ serverSocket.getLocalPort());    
+			return true;
+		} catch (IOException e) {
+			logger.error("Error! Cannot open server socket:");
+			if(e instanceof BindException){
+				logger.error("Port " + port + " is already bound!");
+			}
+			return false;
+		}
 	}
 
 	@Override
-    public void clearStorage(){
-		// TODO Auto-generated method stub
-	}
+	public void run(){
+		running = initializeServer();
 
-    private boolean initializeServer() {
-    	logger.info("Initializing server...");
-    	try {
-            serverSocket = new ServerSocket(port);
-            logger.info("Server listening on port: " 
-            		+ serverSocket.getLocalPort());    
-            return true;
-        } catch (IOException e) {
-        	logger.error("Error! Cannot open server socket:");
-            if(e instanceof BindException){
-            	logger.error("Port " + port + " is already bound!");
-            }
-            return false;
-        }
-    }
-
-	@Override
-    public void run(){
-    	running = initializeServer();
-
-        if(serverSocket != null) {
-	        while(this.running){
-	            try {
-	                Socket client = serverSocket.accept();                
-	                ClientConnection connection = 
-	                		new ClientConnection(this, client);
-	                new Thread(connection).start();
+		if(serverSocket != null) {
+			while(this.running){
+				try {
+					Socket client = serverSocket.accept();                
+					ClientConnection connection = 
+							new ClientConnection(this, client);
+					new Thread(connection).start();
 	                
-	                logger.info("Connected to " 
-	                		+ client.getInetAddress().getHostName() 
-	                		+  " on port " + client.getPort());
-	            } catch (IOException e) {
-	            	logger.error("Error! " +
-	            			"Unable to establish connection. \n", e);
-	            }
-	        }
-        }
-        logger.info("Server stopped.");
+					logger.info("Connected to " 
+							+ client.getInetAddress().getHostName() 
+							+  " on port " + client.getPort());
+				} catch (IOException e) {
+					logger.error("Error! " +
+							"Unable to establish connection. \n", e);
+				}
+			}
+		}
+		logger.info("Server stopped.");
 	}
 
 	@Override
-    public void kill(){
-		// TODO Auto-generated method stub
+	public void kill(){
+
 	}
 
 	@Override
-    public void close(){
-        running = false;
-        try {
+	public void close(){
+		running = false;
+		try {
 			serverSocket.close();
 		} catch (IOException e) {
 			logger.error("Error! " +
@@ -250,7 +246,7 @@ public class KVServer implements IKVServer {
      * Main entry point for the server application. 
      * @param args contains the port number at args[0], cachesize at args[1], strategy at args[2].
      */
-    public static void main(String[] args) {
+	public static void main(String[] args) {
     	try {
 			new LogSetup("logs/server.log", Level.ALL);
 			if(args.length != 3) {

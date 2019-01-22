@@ -2,6 +2,8 @@
 bin/
 
 #ignore manifest files
-.MF
+*.MF
+*.jar
+*.log
 /nbproject/private/
 /build/
