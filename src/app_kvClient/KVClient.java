@@ -235,8 +235,16 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
         @Override public void handleNewMessage(TextMessage msg) {
                 if(!stop) {
-                        System.out.println("\rServer Reply: " + msg.getMsg());
-                        System.out.print(PROMPT);
+                    if (msg.isValid() == 0) {
+                        logger.warn("Server Reply Format Invalid. Message: " + msg.getMsg());
+                        System.out.println("\rServer Reply Format Invalid.");
+                        System.out.println("Expecting: <status> <key> <value> eg: 'GET_SUCCESS key1 test1'");
+                        System.out.println("Got: " + msg.getMsg());
+                    } else {
+                        logger.info("Success: " + msg.getMsg());
+                        System.out.print("Success: " + msg.getMsg());
+                    }
+                    System.out.print(PROMPT);
                 }
         }
 
