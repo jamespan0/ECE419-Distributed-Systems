@@ -23,6 +23,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
         private BufferedReader stdin;
         private KVStore client = null;
         private boolean stop = false;
+		private boolean connected = false;
 
         private String serverAddress;
         private int serverPort;
@@ -167,6 +168,8 @@ public class KVClient implements IKVClient, ClientSocketListener {
         }
 
         private void disconnect() {
+				connected = false;
+
                 if(client != null) {
                         client.closeConnection();
                         client = null;
@@ -233,6 +236,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
         }
 
         @Override public void handleNewMessage(TextMessage msg) {
+			if (connected) {
                 if(!stop) {
                     if (msg.isValid() == 0) {
                         logger.warn("Server Reply Format Invalid. Message: " + msg.getMsg());
@@ -241,10 +245,20 @@ public class KVClient implements IKVClient, ClientSocketListener {
                         System.out.println("Got: " + msg.getMsg());
                     } else {
                         logger.info("Success: " + msg.getMsg());
-                        System.out.print("Success: " + msg.getMsg());
+                        System.out.println(msg.getMsg());
                     }
                     System.out.print(PROMPT);
                 }
+			} else {
+                logger.info(msg.getMsg());
+				
+				if (msg.getMsg().indexOf("Connection to storage server established:") != 0) {
+					connected = true;
+				}
+
+                System.out.println(msg.getMsg());
+                System.out.print(PROMPT);
+			}
         }
 
         @Override public void handleStatus(SocketStatus status) {

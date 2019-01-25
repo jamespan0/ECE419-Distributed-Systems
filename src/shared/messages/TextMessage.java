@@ -114,8 +114,7 @@ public class TextMessage implements KVMessage, Serializable {
             return null;
         }
         
-        public int isValid() {
-            
+        public int isValid() {            
             // must have a status
             StatusType status = getStatus();
             if (status == null) {

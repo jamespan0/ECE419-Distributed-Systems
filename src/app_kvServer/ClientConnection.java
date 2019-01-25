@@ -54,11 +54,11 @@ public class ClientConnection implements Runnable {
 					String value = "temp";
 		
 					if(false) {  //NEEDS ERROR LOGIC IN PUTKV 
-						sendMessage(new TextMessage("PUT_ERROR<" + stringArray[1] + ", "+ stringArray[2] + ">"));
+						sendMessage(new TextMessage("PUT_ERROR " + stringArray[1] + " "+ stringArray[2]));
 					} else if (false) {
-						sendMessage(new TextMessage("PUT_UPDATE<" + stringArray[1] + ", "+ stringArray[2] + ">"));
+						sendMessage(new TextMessage("PUT_UPDATE " + stringArray[1] + " "+ stringArray[2]));
 					} else {
-						sendMessage(new TextMessage("PUT_SUCCESS<" + stringArray[1] + ", "+ stringArray[2] + ">"));
+						sendMessage(new TextMessage("PUT_SUCCESS " + stringArray[1] + " "+ stringArray[2]));
 					}
 				} catch (Exception e) {
 					logger.error("Error: PUT command unsuccessful!", e);
@@ -76,9 +76,9 @@ public class ClientConnection implements Runnable {
 					String value = server.getKV(stringArray[1]);
 
 					if(false) {  //NEEDS ERROR LOGIC IN GETKV 
-						sendMessage(new TextMessage("GET_ERROR<" + stringArray[1] + ">"));
+						sendMessage(new TextMessage("GET_ERROR " + stringArray[1]));
 					} else {
-						sendMessage(new TextMessage("GET_SUCCESS<" + stringArray[1] + ", "+ value + ">"));
+						sendMessage(new TextMessage("GET_SUCCESS " + stringArray[1] + " "+ value));
 					}
 				} catch (Exception e) {
 					logger.error("Error: GET command unsuccessful!", e);
@@ -102,7 +102,7 @@ public class ClientConnection implements Runnable {
 			input = clientSocket.getInputStream();
 		
 			sendMessage(new TextMessage(
-					"Connection to storage server established: " 
+					"Connection to KV server established: " 
 					+ server.getHostname() + ":"
 					+ server.getPort()));
 			
