@@ -33,31 +33,33 @@ public class KVStore extends Thread implements KVCommInterface {
          * @param address the address of the KVServer
          * @param port the port of the KVServer
          */
-        public KVStore(String address, int port) 
-                        throws UnknownHostException, IOException {
-
+        public KVStore(String address, int port) throws Exception {
                 clientSocket = new Socket(address, port);
+                connect();
+                
+        }
+
+        @Override public void connect() throws Exception {
+                
                 listeners = new HashSet<ClientSocketListener>();
                 setRunning(true);
                 logger.info("Connection established");
         }
 
-        @Override public void connect() throws Exception {
-                // TODO Auto-generated method stub
-        }
-
         @Override public void disconnect() {
-                // TODO Auto-generated method stub
+                
+                closeConnection();
         }
 
         @Override public KVMessage put(String key, String value) throws Exception {
-                // TODO Auto-generated method stub
-                return null;
+            
+                return (new TextMessage("put " + key + " " + value));
+            
         }
 
         @Override public KVMessage get(String key) throws Exception {
-                // TODO Auto-generated method stub
-                return null;
+                
+                return (new TextMessage("get " + key));
         }
 
         /**
