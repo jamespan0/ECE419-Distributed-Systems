@@ -102,7 +102,7 @@ public class ClientConnection implements Runnable {
 			input = clientSocket.getInputStream();
 		
 			sendMessage(new TextMessage(
-					"Connection to storage server established: " 
+					"Connection to KV server established: " 
 					+ server.getHostname() + ":"
 					+ server.getPort()));
 			
