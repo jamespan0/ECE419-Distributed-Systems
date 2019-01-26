@@ -53,6 +53,7 @@ public class KVStore extends Thread implements KVCommInterface {
         @Override public KVMessage put(String key, String value) throws Exception {
             
                 TextMessage request = new TextMessage("put " + key + " " + value);
+                logger.info("KVStore: Sending " + request.toString());
                 sendMessage(request);
                 return api_receive_msg();
         }
@@ -60,6 +61,7 @@ public class KVStore extends Thread implements KVCommInterface {
         @Override public KVMessage get(String key) throws Exception {
                 
                 TextMessage request = new TextMessage("get " + key);
+                logger.info("KVStore: Sending " + request.toString());
                 sendMessage(request);
                 return api_receive_msg();
         }
@@ -67,6 +69,7 @@ public class KVStore extends Thread implements KVCommInterface {
         private KVMessage api_receive_msg() {
             try {
                     TextMessage latestMsg = receiveMessage();
+                    logger.info("Received Response: " + latestMsg.toString());
                     return latestMsg;
             } catch (IOException ioe) {
                     if(isRunning()) {
@@ -216,6 +219,11 @@ public class KVStore extends Thread implements KVCommInterface {
 
                         /* read next char from stream */
                         read = (byte) input.read();
+                }
+                
+                if (read == -1) {
+                    logger.warn("Server Terminated!");
+                    closeConnection();
                 }
 
                 if(msgBytes == null){
