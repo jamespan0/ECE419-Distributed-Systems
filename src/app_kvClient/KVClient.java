@@ -92,14 +92,16 @@ public class KVClient implements IKVClient, ClientSocketListener {
                 case "put":
                     if(tokens.length == 3) {
                         if(client != null && client.isRunning()){
-                            String key = tokens[1];
-                            String value = tokens[2];
                             
-                            try {
-                                sendMessage((TextMessage)client.put(key, value));
-                            } catch (Exception e) {
-                                printError("Invalid Inputs!");
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
                             }
+                            sendMessage(msg.toString());
+
                         } else {
                             printError("Not connected!");
                         }
@@ -112,13 +114,16 @@ public class KVClient implements IKVClient, ClientSocketListener {
                 case "get":
                     if(tokens.length == 2) {
                         if(client != null && client.isRunning()){
-                            String key = tokens[1];
-                            
-                            try {
-                                sendMessage((TextMessage)client.get(key));
-                            } catch (Exception e) {
-                                printError("Invalid Inputs!");
+
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
                             }
+                            sendMessage(msg.toString());
+                            
                         } else {
                             printError("Not connected!");
                         }
@@ -157,10 +162,10 @@ public class KVClient implements IKVClient, ClientSocketListener {
                     break;
             }
         }
-
-        private void sendMessage(TextMessage msg) {
+            
+        private void sendMessage(String msg){
                 try {
-                        client.sendMessage(msg);
+                        client.sendMessage(new TextMessage(msg));
                 } catch (IOException e) {
                         printError("Unable to send message!");
                         disconnect();

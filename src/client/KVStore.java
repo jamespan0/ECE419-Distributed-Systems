@@ -36,7 +36,6 @@ public class KVStore extends Thread implements KVCommInterface {
         public KVStore(String address, int port) throws Exception {
                 clientSocket = new Socket(address, port);
                 connect();
-                
         }
 
         @Override public void connect() throws Exception {
@@ -53,13 +52,37 @@ public class KVStore extends Thread implements KVCommInterface {
 
         @Override public KVMessage put(String key, String value) throws Exception {
             
-                return (new TextMessage("put " + key + " " + value));
-            
+                TextMessage request = new TextMessage("put " + key + " " + value);
+                sendMessage(request);
+                return api_receive_msg();
         }
 
         @Override public KVMessage get(String key) throws Exception {
                 
-                return (new TextMessage("get " + key));
+                TextMessage request = new TextMessage("get " + key);
+                sendMessage(request);
+                return api_receive_msg();
+        }
+        
+        private KVMessage api_receive_msg() {
+            try {
+                    TextMessage latestMsg = receiveMessage();
+                    return latestMsg;
+            } catch (IOException ioe) {
+                    if(isRunning()) {
+                            logger.error("Connection lost!");
+                            try {
+                                    tearDownConnection();
+                                    for(ClientSocketListener listener : listeners) {
+                                            listener.handleStatus(
+                                                            SocketStatus.CONNECTION_LOST);
+                                    }
+                            } catch (IOException e) {
+                                    logger.error("Unable to close connection!");
+                            }
+                    }
+            }
+            return null;
         }
 
         /**
