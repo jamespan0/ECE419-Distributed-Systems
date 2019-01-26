@@ -122,15 +122,7 @@ public class ClientConnection implements Runnable {
 			logger.error("Error! Connection could not be established!", ioe);
 		} finally {
 			
-			try {
-				if (clientSocket != null) {
-					input.close();
-					output.close();
-					clientSocket.close();
-				}
-			} catch (IOException ioe) {
-				logger.error("Error! Unable to tear down connection!", ioe);
-			}
+			closeConnection();
 		}
 	}
 	
@@ -147,7 +139,7 @@ public class ClientConnection implements Runnable {
 				+ clientSocket.getInetAddress().getHostAddress() + ":" 
 				+ clientSocket.getPort() + ">: '" 
 				+ msg.getMsg() +"'");
-    }
+        }
 	
 	
 	private TextMessage receiveMessage() throws IOException {
@@ -190,6 +182,12 @@ public class ClientConnection implements Runnable {
 			/* read next char from stream */
 			read = (byte) input.read();
 		}
+                
+                // Check for TCP FIN
+                if (read == -1) {
+                    // Close connection
+                    closeConnection();
+                }
 		
 		if(msgBytes == null){
 			tmp = new byte[index];
@@ -212,6 +210,17 @@ public class ClientConnection implements Runnable {
 		return msg;
     }
 	
-
+        private void closeConnection() {
+            isOpen = false;
+            try {
+                if (clientSocket != null) {
+                    input.close();
+                    output.close();
+                    clientSocket.close();
+                }
+            } catch (IOException ioe) {
+                logger.error("Error! Unable to tear down connection!", ioe);
+            }
+        }
 	
 }

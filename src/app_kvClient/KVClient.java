@@ -173,7 +173,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
         }
 
         private void disconnect() {
-				connected = false;
+		connected = false;
 
                 if(client != null) {
                         client.closeConnection();
