@@ -28,18 +28,23 @@ public class KVStore extends Thread implements KVCommInterface {
         private static final int BUFFER_SIZE = 1024;
         private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
 
+        private String address;
+        private int port;
         /**
          * Initialize KVStore with address and port of KVServer
          * @param address the address of the KVServer
          * @param port the port of the KVServer
          */
         public KVStore(String address, int port) throws Exception {
-                clientSocket = new Socket(address, port);
+
+                this.address = address;
+                this.port = port;
                 connect();
         }
 
         @Override public void connect() throws Exception {
                 
+                clientSocket = new Socket(address, port);
                 listeners = new HashSet<ClientSocketListener>();
                 setRunning(true);
                 logger.info("Connection established");
