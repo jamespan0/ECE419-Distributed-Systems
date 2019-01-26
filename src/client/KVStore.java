@@ -35,11 +35,10 @@ public class KVStore extends Thread implements KVCommInterface {
          * @param address the address of the KVServer
          * @param port the port of the KVServer
          */
-        public KVStore(String address, int port) throws Exception {
+        public KVStore(String address, int port) {
 
                 this.address = address;
                 this.port = port;
-                connect();
         }
 
         @Override public void connect() throws Exception {

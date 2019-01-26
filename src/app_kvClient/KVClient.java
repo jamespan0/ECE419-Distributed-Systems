@@ -30,6 +30,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
         @Override public void newConnection(String hostname, int port) throws Exception, UnknownHostException, IOException {
             client = new KVStore(hostname, port);
+            client.connect();
             client.addListener(this);
             client.start();
         }
