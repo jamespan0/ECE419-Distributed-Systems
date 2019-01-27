@@ -7,6 +7,14 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.io.BufferedWriter;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.FileReader;
+import java.io.FileNotFoundException;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import logger.LogSetup;
 
@@ -39,31 +47,86 @@ public class KVServer implements IKVServer, Runnable {
 	private int cacheSize;
 	private CacheStrategy cacheStrategy;
 
-
-	/*     START OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
-	private HashMap<String, String> disk_storage;     //data structure for disk storage
-	private HashMap<String, String> cache_LRU;     //data structure for cache_LRU case
-	private HashMap<String, String> cache_LFU;     //data structure for cache_LFU case
-	private HashMap<String, String> cache_FIFO;     //data structure for cache_FIFO case
-	/*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
+    /*     START OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
+    //private HashMap<String, String> disk_storage;     //data structure for disk storage
+    private LinkedHashMap<String, String> cache_LRU;     //data structure for cache_LRU case
+    private LinkedHashMap<String, String> cache_FIFO;     //data structure for cache_FIFO case
+    private BufferedWriter disk_write;
+    private BufferedWriter temp_disk_write;
+    private BufferedReader disk_read;
+//    private LinkedHashMap<String, String> cache_LFU;     //data structure for cache_LFU case
+    private LFUCache lfucache;
+    private File outputFile;
+    private File tempFile;
+    public String filename = "./persistantStorage.data";
+    public String tempname = "./.temp.persistantStorage.data";
+    /*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
 
 
 	public KVServer(int port, int cacheSize, String strategy) {
-		this.port = port;
-		this.cacheSize = cacheSize;
-		disk_storage = new HashMap<String, String>(); //disk KVstorage
-		if (strategy.equals("FIFO")) {
-			this.cacheStrategy = CacheStrategy.FIFO;
-		}
-		else if (strategy.equals("LFU")) {
-			this.cacheStrategy = CacheStrategy.LFU;
-		}
-		else if (strategy.equals("LRU")) {
-			this.cacheStrategy = CacheStrategy.LRU;
-		}
-		else {
-			this.cacheStrategy = CacheStrategy.FIFO; //in case of fail, just do FIFO operation
-		}
+		// TODO Auto-generated method stub
+        this.port = port;
+        this.cacheSize = cacheSize;
+        //disk_storage = new HashMap<String, String>(); //disk KVstorage
+        File outputFile = new File(filename);
+        File tempFile = new File(tempname);
+
+        try {
+            outputFile.createNewFile();
+            BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
+            BufferedWriter temp_disk_write = new BufferedWriter(new FileWriter(tempFile,true)); //true so that any new data is just appended
+        } catch (IOException ioe) {
+            System.out.println("Trouble creating file: " + ioe.getMessage());
+        }
+
+        try {
+            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+        } catch (FileNotFoundException e) {
+            //create file anew if file is not found
+            outputFile = new File(filename);
+            try {
+                outputFile.createNewFile();
+            } catch (IOException ioe) {
+                System.out.println("Trouble creating file: " + ioe.getMessage());
+            }
+        } catch (IOException ioe) {
+            System.out.println("Trouble reading from the file: " + ioe.getMessage());
+        }
+
+        if (strategy.equals("FIFO")) {
+            this.cacheStrategy = IKVServer.CacheStrategy.FIFO;
+            LinkedHashMap<String, String> cache_FIFO =  
+                new LinkedHashMap<String, String>() { 
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) 
+                    { 
+                        return size() > getCacheSize(); 
+                    } 
+            }; 
+        }
+        else if (strategy.equals("LFU")) {
+            this.cacheStrategy = IKVServer.CacheStrategy.LFU;
+            LFUCache lfucache = new LFUCache(getCacheSize());
+        }
+        else if (strategy.equals("LRU")) {
+            this.cacheStrategy = IKVServer.CacheStrategy.LRU;
+            LinkedHashMap<String, String> cache_LRU =  
+                new LinkedHashMap<String, String>(getCacheSize(), .75f , true) { 
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) 
+                    { 
+                        return size() > getCacheSize(); 
+                    } 
+            }; 
+        }
+        else {
+            this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
+            LinkedHashMap<String, String> cache_FIFO =  
+                new LinkedHashMap<String, String>() { 
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) 
+                    { 
+                        return size() > getCacheSize(); 
+                    } 
+            }; 
+        }
         
 	}
     
@@ -103,86 +166,181 @@ public class KVServer implements IKVServer, Runnable {
 	}
 
 	@Override
-	public boolean inStorage(String key){
-        /*
-            1) run incache
-            2) then check if it is in cache
-        */
+    public boolean inStorage(String key){
+        if (inCache(key)) {
+            return true ;
+        }
+
+        // iterate through memory to see if located in disk
+        String strCurrentLine;
+        try {
+            while ((strCurrentLine = disk_read.readLine()) != null) {
+                String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
+                if (keyValue[0].equals(key)) {
+                    return true;
+                }
+            }
+            disk_read.close();
+        } catch (IOException e) {
+			System.out.println("Error! unalbe to read!");
+		} 
+        // no key found in cache nor storage
+
+		return false;
+	}
+
+
+	@Override
+    public boolean inCache(String key){
+
+        if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
+            // FIFO case
+            return cache_FIFO.containsKey(key);
+        } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
+            // LRU case
+            return cache_LRU.containsKey(key);
+        } else {
+            // LFU case
+            return lfucache.lfu_containsKey(key);
+        }
+	}
+
+	@Override
+    public String getKV(String key) throws Exception{
+		// TODO Auto-generated method stub
         // Constraint checking for key and value
-        /*
         if (key.getBytes("UTF-8").length > 20) {
-            return false; //ERROR due to key length too long
+            return "ERROR"; //ERROR due to key length too long
         }
-        */
 
-		return false;
-	}
-
-	@Override
-	public boolean inCache(String key){
-        /*
-            --> subpart of inStorage, check in 
-        */
-        // Constraint checking for key and value
-        /*
-        	if (key.getBytes("UTF-8").length > 20) {
-            	return false; //ERROR due to key length too long
+        if (inCache(key)) {
+            if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
+                // FIFO case
+                return cache_FIFO.get(key);
+            } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
+                // LRU case
+                return cache_LRU.get(key);
+            } else {
+                // LFU case
+                return lfucache.lfu_get(key);
+            }
         }
-        */
+        // iterate through memory to see if located in disk
+        String strCurrentLine;
+        while ((strCurrentLine = disk_read.readLine()) != null) {
+            String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
+            if (keyValue[0].equals(key)) {
+                return keyValue[1];
+            }
+        }
+        disk_read.close();
 
-		return false;
+		return "ERROR_NO_KEY_FOUND";
 	}
 
 	@Override
-	public String getKV(String key) throws Exception{        
-        /*
-            strategy:
-            1) search cache first for key value pair: if not found
-            2) search full list of memory for key value pair
-        */
-        // Constraint checking for key and value
-		if (key.getBytes("US_ASCII").length > 20) {
-			return "ERROR"; //ERROR due to key length too long
-		}
-
-		return "test";
-	}
-
-	@Override
-	public void putKV(String key, String value) throws Exception{
+    public void putKV(String key, String value) throws Exception{
+		// TODO Auto-generated method stub
         /*
             strategy:
             1) use map to store data structure
         */
         // Constraint checking for key and value
-		if (key.getBytes("US_ASCII").length > 20) {
-			return; //ERROR due to key length too long
-		}
+        if (key.getBytes("UTF-8").length > 20) {
+            return; //ERROR due to key length too long
+        }
 
-		//120kB is around 122880 bytes
-		if (value.getBytes("US_ASCII").length > 122880) {
-			return; //ERROR due to value length too long
-		}
+        //120kB is around 122880 bytes
+        if (value.getBytes("UTF-8").length > 122880) {
+            return; //ERROR due to value length too long
+        }
 
-		// if value is null, delete the key
-		if (value == null) {
-			if (disk_storage.containsKey(key)) {
-				disk_storage.remove(key); //remove key if exists
-				return;
-			}
-		}
-		//else replace
-		disk_storage.put(key,value);
+        if (value == null) {
+            // delete key
+            if (inCache(key)) {
+                if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
+                    // FIFO case
+                    cache_FIFO.remove(key);
+                } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
+                    // LRU case
+                    cache_LRU.remove(key);
+                } else {
+                    // LFU case
+                    lfucache.lfu_remove(key);
+                }
+            }
+
+            if (inStorage(key)){
+                // need to remove the key from the list
+                String strCurrentLine;
+                try {
+                    while ((strCurrentLine = disk_read.readLine()) != null) {
+                        String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
+                        if (!keyValue[0].equals(key)) {
+                            temp_disk_write.write(strCurrentLine);
+                        }
+                    }
+                    disk_read.close();
+                    temp_disk_write.close();
+                    // at end rename file
+                    boolean success = tempFile.renameTo(outputFile); //renamed
+                } catch (IOException e) {
+                    System.out.println("Error! unalbe to read!");
+                } 
+            }
+        } else {
+            // insert key in cache
+            if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
+                // FIFO case
+                cache_FIFO.put(key,value);
+            } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
+                // LRU case
+                cache_LRU.put(key,value);
+            } else {
+                // LFU case
+                lfucache.lfu_put(key,value);
+            }
+
+            // insert key in storage
+            if (!inStorage(key)) {
+                String diskEntry = key + " " + value ;
+                disk_write.write(diskEntry);
+                disk_write.close();
+            }
+
+        }
+
+
+	}
+
+
+	@Override
+    public void clearCache(){
+		// TODO Auto-generated method stub
+        if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
+            // FIFO case
+            cache_FIFO.clear();
+        } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
+            // LRU case
+            cache_LRU.clear();
+        } else {
+            // LFU case
+            lfucache.lfu_clear();
+        }
+
 	}
 
 	@Override
-	public void clearCache(){
-
-	}
-
-	@Override
-	public void clearStorage(){
-
+    public void clearStorage(){
+		// TODO Auto-generate method stub
+            clearCache();        //clear the cache
+            //delete memory file on disk
+            try {
+                outputFile.delete();
+                outputFile.createNewFile();
+            } catch (IOException ioe) {
+                System.out.println("Trouble deleting/creating file: " + ioe.getMessage());
+            }
 	}
 
 	private boolean initializeServer() {
