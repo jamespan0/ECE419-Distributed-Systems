@@ -14,7 +14,7 @@ public class AllTests {
 
 	static {
 		try {
-                        new LogSetup("logs/testing/test.log", Level.ERROR);
+                        new LogSetup("logs/testing/test.log", Level.ALL);
                         KVServer svr = new KVServer(50000, 10, "FIFO");
                         Thread svr_thread = new Thread(svr);
                         svr_thread.start();
