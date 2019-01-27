@@ -28,18 +28,22 @@ public class KVStore extends Thread implements KVCommInterface {
         private static final int BUFFER_SIZE = 1024;
         private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
 
+        private String address;
+        private int port;
         /**
          * Initialize KVStore with address and port of KVServer
          * @param address the address of the KVServer
          * @param port the port of the KVServer
          */
-        public KVStore(String address, int port) throws Exception {
-                clientSocket = new Socket(address, port);
-                connect();
+        public KVStore(String address, int port) {
+
+                this.address = address;
+                this.port = port;
         }
 
         @Override public void connect() throws Exception {
                 
+                clientSocket = new Socket(address, port);
                 listeners = new HashSet<ClientSocketListener>();
                 setRunning(true);
                 logger.info("Connection established");
@@ -53,6 +57,7 @@ public class KVStore extends Thread implements KVCommInterface {
         @Override public KVMessage put(String key, String value) throws Exception {
             
                 TextMessage request = new TextMessage("put " + key + " " + value);
+                logger.info("KVStore: Sending " + request.toString());
                 sendMessage(request);
                 return api_receive_msg();
         }
@@ -60,6 +65,7 @@ public class KVStore extends Thread implements KVCommInterface {
         @Override public KVMessage get(String key) throws Exception {
                 
                 TextMessage request = new TextMessage("get " + key);
+                logger.info("KVStore: Sending " + request.toString());
                 sendMessage(request);
                 return api_receive_msg();
         }
@@ -67,6 +73,7 @@ public class KVStore extends Thread implements KVCommInterface {
         private KVMessage api_receive_msg() {
             try {
                     TextMessage latestMsg = receiveMessage();
+                    logger.info("Received Response: " + latestMsg.toString());
                     return latestMsg;
             } catch (IOException ioe) {
                     if(isRunning()) {
@@ -216,6 +223,11 @@ public class KVStore extends Thread implements KVCommInterface {
 
                         /* read next char from stream */
                         read = (byte) input.read();
+                }
+                
+                if (read == -1) {
+                    logger.warn("Server Terminated!");
+                    closeConnection();
                 }
 
                 if(msgBytes == null){

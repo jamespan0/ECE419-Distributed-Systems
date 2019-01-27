@@ -1,9 +1,12 @@
 #ignore bin folders
 bin/
 
+#ignore log folders
+logs/
+
 #ignore manifest files
 *.MF
-*.jar
-*.log
+m1-client.jar
+m1-server.jar
 /nbproject/private/
 /build/

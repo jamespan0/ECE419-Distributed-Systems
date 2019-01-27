@@ -17,7 +17,7 @@ import client.KVStore;
 
 import shared.messages.TextMessage;
 
-public class KVServer implements IKVServer {
+public class KVServer implements IKVServer, Runnable {
 	/**
 	 * Start KV Server at given port
 	 * @param port given port for storage server to operate - in echoServer gave range 49152 to 65535
