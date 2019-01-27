@@ -141,7 +141,7 @@ public class KVServer implements IKVServer {
             2) search full list of memory for key value pair
         */
         // Constraint checking for key and value
-		if (key.getBytes("UTF-8").length > 20) {
+		if (key.getBytes("US_ASCII").length > 20) {
 			return "ERROR"; //ERROR due to key length too long
 		}
 
@@ -155,12 +155,12 @@ public class KVServer implements IKVServer {
             1) use map to store data structure
         */
         // Constraint checking for key and value
-		if (key.getBytes("UTF-8").length > 20) {
+		if (key.getBytes("US_ASCII").length > 20) {
 			return; //ERROR due to key length too long
 		}
 
 		//120kB is around 122880 bytes
-		if (value.getBytes("UTF-8").length > 122880) {
+		if (value.getBytes("US_ASCII").length > 122880) {
 			return; //ERROR due to value length too long
 		}
 
