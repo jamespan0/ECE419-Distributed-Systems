@@ -207,7 +207,6 @@ public class KVServer implements IKVServer, Runnable {
 
 	@Override
     public String getKV(String key) throws Exception{
-		// TODO Auto-generated method stub
         // Constraint checking for key and value
         if (key.getBytes("UTF-8").length > 20) {
             return "ERROR"; //ERROR due to key length too long
@@ -240,7 +239,6 @@ public class KVServer implements IKVServer, Runnable {
 
 	@Override
     public void putKV(String key, String value) throws Exception{
-		// TODO Auto-generated method stub
         /*
             strategy:
             1) use map to store data structure
@@ -349,6 +347,9 @@ public class KVServer implements IKVServer, Runnable {
 			serverSocket = new ServerSocket(port);
 			logger.info("Server listening on port: " 
 					+ serverSocket.getLocalPort());    
+			logger.info("Server cache strategy type is " 
+					+ cacheStrategy + " with size "
+					+ cacheSize);    
 			return true;
 		} catch (IOException e) {
 			logger.error("Error! Cannot open server socket:");
