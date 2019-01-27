@@ -1,6 +1,9 @@
 #ignore bin folders
 bin/
 
+#ignore log folders
+logs/
+
 #ignore manifest files
 *.MF
 *.jar
