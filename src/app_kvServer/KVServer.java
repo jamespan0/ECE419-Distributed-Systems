@@ -48,28 +48,43 @@ public class KVServer implements IKVServer, Runnable {
 	private CacheStrategy cacheStrategy;
 
     /*     START OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
-    //private HashMap<String, String> disk_storage;     //data structure for disk storage
-    private LinkedHashMap<String, String> cache_LRU;     //data structure for cache_LRU case
-    private LinkedHashMap<String, String> cache_FIFO;     //data structure for cache_FIFO case
+//    static LinkedHashMap<String, String> cache_LRU;     //data structure for cache_LRU case
+   // private LinkedHashMap<String, String> cache_FIFO;     //data structure for cache_FIFO case
+    // private LFUCache lfucache;
+    //private File outputFile;
+    //private File tempFile;
+
+    private String filename = "./persistantStorage.data";
+    private String tempname = "./.temp.persistantStorage.data";
+    private LinkedHashMap<String, String> cache_LRU = new LinkedHashMap<String, String>(getCacheSize(), .75f , true) { 
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) { 
+            return size() > getCacheSize(); 
+        } 
+    }; 
+    private LinkedHashMap <String, String> cache_FIFO = new LinkedHashMap<String, String>() { 
+        protected boolean removeEldestEntry(Map.Entry<String, String> eldest) { 
+            return size() > getCacheSize(); 
+        } 
+    }; 
+    private LFUCache lfucache = new LFUCache(getCacheSize());
+    private File outputFile = new File(filename);
+    private File tempFile = new File(tempname);
+
+
     private BufferedWriter disk_write;
     private BufferedWriter temp_disk_write;
     private BufferedReader disk_read;
 //    private LinkedHashMap<String, String> cache_LFU;     //data structure for cache_LFU case
-    private LFUCache lfucache;
-    private File outputFile;
-    private File tempFile;
-    public String filename = "./persistantStorage.data";
-    public String tempname = "./.temp.persistantStorage.data";
-    /*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
 
+    /*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
 
 	public KVServer(int port, int cacheSize, String strategy) {
 		// TODO Auto-generated method stub
         this.port = port;
         this.cacheSize = cacheSize;
         //disk_storage = new HashMap<String, String>(); //disk KVstorage
-        File outputFile = new File(filename);
-        File tempFile = new File(tempname);
+ //       File outputFile = new File(filename);
+ //       File tempFile = new File(tempname);
 
         try {
             outputFile.createNewFile();
@@ -95,20 +110,24 @@ public class KVServer implements IKVServer, Runnable {
 
         if (strategy.equals("FIFO")) {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO;
-            LinkedHashMap<String, String> cache_FIFO =  
-                new LinkedHashMap<String, String>() { 
+            System.out.println("Constructing cache_FIFO");
+            /*
+            LinkedHashMap <String, String> cache_FIFO = new LinkedHashMap<String, String>(getCacheSize()) { 
                 protected boolean removeEldestEntry(Map.Entry<String, String> eldest) 
                     { 
                         return size() > getCacheSize(); 
                     } 
             }; 
+            */
+
         }
         else if (strategy.equals("LFU")) {
             this.cacheStrategy = IKVServer.CacheStrategy.LFU;
-            LFUCache lfucache = new LFUCache(getCacheSize());
+            //LFUCache lfucache = new LFUCache(getCacheSize());
         }
         else if (strategy.equals("LRU")) {
             this.cacheStrategy = IKVServer.CacheStrategy.LRU;
+            /*
             LinkedHashMap<String, String> cache_LRU =  
                 new LinkedHashMap<String, String>(getCacheSize(), .75f , true) { 
                 protected boolean removeEldestEntry(Map.Entry<String, String> eldest) 
@@ -116,19 +135,29 @@ public class KVServer implements IKVServer, Runnable {
                         return size() > getCacheSize(); 
                     } 
             }; 
+            */
         }
         else {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
-            LinkedHashMap<String, String> cache_FIFO =  
-                new LinkedHashMap<String, String>() { 
+            /*
+            LinkedHashMap <String, String> cache_FIFO = new LinkedHashMap<String, String>() { 
                 protected boolean removeEldestEntry(Map.Entry<String, String> eldest) 
                     { 
                         return size() > getCacheSize(); 
                     } 
             }; 
+            */
         }
         
 	}
+
+    public LinkedHashMap<String, String> getFIFO() {
+        return this.cache_FIFO ;
+    }
+
+    public void putFIFO(String key, String value) {
+        this.cache_FIFO.put(key,value);
+    }
     
 	
 	@Override
@@ -174,6 +203,9 @@ public class KVServer implements IKVServer, Runnable {
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
+            BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
+            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+
             while ((strCurrentLine = disk_read.readLine()) != null) {
                 String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
                 if (keyValue[0].equals(key)) {
@@ -182,7 +214,7 @@ public class KVServer implements IKVServer, Runnable {
             }
             disk_read.close();
         } catch (IOException e) {
-			System.out.println("Error! unalbe to read!");
+			System.out.println("Error! unable to read/write!");
 		} 
         // no key found in cache nor storage
 
@@ -195,7 +227,7 @@ public class KVServer implements IKVServer, Runnable {
 
         if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
             // FIFO case
-            return cache_FIFO.containsKey(key);
+            return this.cache_FIFO.containsKey(key);
         } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
             // LRU case
             return cache_LRU.containsKey(key);
@@ -216,7 +248,7 @@ public class KVServer implements IKVServer, Runnable {
         if (inCache(key)) {
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // FIFO case
-                return cache_FIFO.get(key);
+                return this.cache_FIFO.get(key);
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
                 return cache_LRU.get(key);
@@ -227,6 +259,13 @@ public class KVServer implements IKVServer, Runnable {
         }
         // iterate through memory to see if located in disk
         String strCurrentLine;
+        try {
+            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+        } catch (IOException ioe) {
+            System.out.println("Trouble Reading file: " + ioe.getMessage());
+            outputFile.createNewFile();
+        }
+
         while ((strCurrentLine = disk_read.readLine()) != null) {
             String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
             if (keyValue[0].equals(key)) {
@@ -255,12 +294,14 @@ public class KVServer implements IKVServer, Runnable {
             return; //ERROR due to value length too long
         }
 
+        System.out.println("Entering");
+
         if (value == null) {
             // delete key
             if (inCache(key)) {
                 if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                     // FIFO case
-                    cache_FIFO.remove(key);
+                    this.cache_FIFO.remove(key);
                 } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                     // LRU case
                     cache_LRU.remove(key);
@@ -274,6 +315,9 @@ public class KVServer implements IKVServer, Runnable {
                 // need to remove the key from the list
                 String strCurrentLine;
                 try {
+                    BufferedWriter temp_disk_write = new BufferedWriter(new FileWriter(tempFile,true)); //true so that any new data is just appended
+                    BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+
                     while ((strCurrentLine = disk_read.readLine()) != null) {
                         String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
                         if (!keyValue[0].equals(key)) {
@@ -292,7 +336,20 @@ public class KVServer implements IKVServer, Runnable {
             // insert key in cache
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // FIFO case
-                cache_FIFO.put(key,value);
+                System.out.println("Inserting FIFO Value");
+                if (this.cache_FIFO == null) {
+                    System.out.println("ERROR: cache_FIFO is null");
+                }
+                this.cache_FIFO.put(key,value);
+                System.out.println("After FIFO Value");
+                // print stuff ou
+                for (Map.Entry<String, String> entry : cache_FIFO.entrySet()) {
+                    String mapvalue = entry.getValue();
+                    String mapkey = entry.getKey();
+                    //Do something
+                    System.out.println("System key: " + mapkey + " with value: " + mapvalue);
+                 }
+
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
                 cache_LRU.put(key,value);
@@ -302,11 +359,10 @@ public class KVServer implements IKVServer, Runnable {
             }
 
             // insert key in storage
-            if (!inStorage(key)) {
-                String diskEntry = key + " " + value ;
-                disk_write.write(diskEntry);
-                disk_write.close();
-            }
+            BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
+            String diskEntry = key + " " + value + "\n" ;
+            disk_write.write(diskEntry);
+            disk_write.close();
 
         }
 
