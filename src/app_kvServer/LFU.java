@@ -1,7 +1,7 @@
 package app_kvServer;
 
 import java.util.HashMap;
-import java.util.TreeMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Comparator;
 import java.util.Collections;
@@ -21,6 +21,10 @@ class LFUCache {
             this.frequency = this.frequency + 1 ;
         }
 
+        public void set_freq(int newFreq) {
+            this.frequency = newFreq;
+        }
+
         public int get_freq() {
             return this.frequency;
         }
@@ -37,17 +41,17 @@ class LFUCache {
 
     //public HashMap<String, String> KV_LFU;
     public HashMap<String, String> KV_LFU = new HashMap<String, String>();
-    public List<Cache> LFU_cache;
+    public List<Cache> LFU_cache = new ArrayList<Cache>();
+    public Comparator<Cache> freq_comparator = new Comparator<Cache>() {
+        public int compare(Cache c1, Cache c2) {
+            return c1.frequency - c2.frequency;
+        }
+    };
     private int maxSize;
 
     public
         LFUCache(int capacity) {
             this.maxSize = capacity;
-            Comparator<Cache> freq_comparator = new Comparator<Cache>() {
-                public int compare(Cache c1, Cache c2) {
-                    return c1.frequency - c2.frequency;
-                }
-            };
         //    HashMap<String, String> KV_LFU = new HashMap<String, String>();
         }
 /*
@@ -86,9 +90,25 @@ class LFUCache {
         }   
 
         public void lfu_put(String key, String value) {
-            
-            lfu_print();
-            if (getSize() == LFU_cache.size()) {
+            if (lfu_containsKey(key)) {
+                //evict old and replace
+                Cache renewCache = new Cache(key);
+                for (int i = 0; i < LFU_cache.size(); i++) {
+                    if (LFU_cache.get(i).LFU_getKey().equals(key)) {
+                        // evict and increment frequency
+                        renewCache.set_freq(LFU_cache.get(i).get_freq());
+                        LFU_cache.remove(i);
+                        renewCache.incr_freq();
+                        LFU_cache.add(renewCache);
+                        Collections.sort(LFU_cache,new Comparator<Cache>(){
+                                             public int compare(Cache c1,Cache c2){
+                                                   return c1.get_freq() - c2.get_freq();
+                                             }});
+                        break;
+                    }
+                }
+            } else if (getSize() == LFU_cache.size()) {
+                //new entry, but cache is full
                 lfu_evict();
                 KV_LFU.put(key,value);  //input into hashmap for locating
                 Cache newEntry = new Cache(key);
@@ -109,6 +129,7 @@ class LFUCache {
                                            return c1.get_freq() - c2.get_freq();
                                      }});
             }
+
 
         }
 
