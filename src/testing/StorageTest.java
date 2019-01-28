@@ -13,7 +13,6 @@ import shared.messages.KVMessage.StatusType;
 public class StorageTest extends TestCase {
     private KVServer app;
 
-/*
     @Test
 	public void testFIFO() {
         KVServer app = new KVServer(1190,3,"FIFO");
@@ -29,9 +28,7 @@ public class StorageTest extends TestCase {
 		}
 		assertTrue(app.inStorage("0") && !app.inCache("0"));
 	}
-*/
 
-/*
     @Test
 	public void testLRU() {
         KVServer app = new KVServer(1190,3,"LRU");
@@ -48,8 +45,7 @@ public class StorageTest extends TestCase {
 		}
 		assertTrue(app.inStorage("1") && !app.inCache("1"));
 	}
-*/
-/*
+
     @Test
 	public void testLFU() {
         KVServer app = new KVServer(1190,3,"LFU");
@@ -68,9 +64,8 @@ public class StorageTest extends TestCase {
 		}
 		assertTrue(app.inStorage("3") && !app.inCache("3"));
 	}
-*/
 
-
+/*
     @Test
 	public void testGet() {
         KVServer app = new KVServer(1190,3,"LFU");
@@ -82,14 +77,12 @@ public class StorageTest extends TestCase {
             app.putKV("2", "1");
             app.putKV("2", "1");
             newString = app.getKV("3");
-            System.out.println("BEFORE NEWSTRING");
-            System.out.println(newString);
-            System.out.println("NOT IN CACHE: " + newString);
 		} catch (Exception e) {
 		    ex = e;	
 		}
 		assertTrue(newString.equals("ERROR_NO_KEY_FOUND"));
 	}
+    */
 }
 
 

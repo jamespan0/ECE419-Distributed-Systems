@@ -323,6 +323,7 @@ public class KVServer implements IKVServer, Runnable {
 
         if (value == null) {
 			result = "ERROR"; //error if deleting non-existent key
+            System.out.println("TEST GOES INTO VALUE EQUALS NULL");
 
             // delete key
             if (inCache(key)) {
@@ -373,6 +374,8 @@ public class KVServer implements IKVServer, Runnable {
 
             }
         } else {
+
+            System.out.println("TEST NOT INTO NULL");
             // insert key in cache
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // FIFO case
