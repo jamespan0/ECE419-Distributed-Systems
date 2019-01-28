@@ -35,7 +35,8 @@ class LFUCache {
 
     }
 
-    public HashMap<String, String> KV_LFU;
+    //public HashMap<String, String> KV_LFU;
+    public HashMap<String, String> KV_LFU = new HashMap<String, String>();
     public List<Cache> LFU_cache;
     private int maxSize;
 
@@ -47,7 +48,7 @@ class LFUCache {
                     return c1.frequency - c2.frequency;
                 }
             };
-            HashMap<String, String> KV_LFU = new HashMap<String, String>();
+        //    HashMap<String, String> KV_LFU = new HashMap<String, String>();
         }
 /*
 //For testing purposes
@@ -86,6 +87,7 @@ class LFUCache {
 
         public void lfu_put(String key, String value) {
             
+            lfu_print();
             if (getSize() == LFU_cache.size()) {
                 lfu_evict();
                 KV_LFU.put(key,value);  //input into hashmap for locating
@@ -107,6 +109,7 @@ class LFUCache {
                                            return c1.get_freq() - c2.get_freq();
                                      }});
             }
+
         }
 
         public void lfu_evict() {
@@ -132,6 +135,16 @@ class LFUCache {
         public void lfu_clear() {
             KV_LFU.clear();
             LFU_cache.clear();
+        }
+
+        public void lfu_print() {
+
+            for (int i = 0; i < LFU_cache.size(); i++) {
+                String keyval = LFU_cache.get(i).LFU_getKey();
+                String valval = KV_LFU.get(keyval);
+                //Do something
+                System.out.println("System key: " + keyval + " with value: " + valval);
+            }
         }
 
 
