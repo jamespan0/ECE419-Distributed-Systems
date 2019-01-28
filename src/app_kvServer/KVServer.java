@@ -15,6 +15,7 @@ import java.io.FileReader;
 import java.io.FileNotFoundException;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.concurrent.locks.*;
 
 import logger.LogSetup;
 
@@ -74,6 +75,7 @@ public class KVServer implements IKVServer, Runnable {
     private BufferedWriter disk_write;
     private BufferedWriter temp_disk_write;
     private BufferedReader disk_read;
+    private Lock lock =  new ReentrantLock();
 //    private LinkedHashMap<String, String> cache_LFU;     //data structure for cache_LFU case
 
     /*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
@@ -207,7 +209,7 @@ public class KVServer implements IKVServer, Runnable {
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
-            BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
+            lock.lock();
             BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
 
             while ((strCurrentLine = disk_read.readLine()) != null) {
@@ -217,6 +219,7 @@ public class KVServer implements IKVServer, Runnable {
                 }
             }
             disk_read.close();
+            lock.unlock();
         } catch (IOException e) {
 			System.out.println("Error! unable to read/write!");
 		} 
@@ -268,6 +271,7 @@ public class KVServer implements IKVServer, Runnable {
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
+            lock.lock();
             disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
             while ((strCurrentLine = disk_read.readLine()) != null) {
                 String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
@@ -276,6 +280,7 @@ public class KVServer implements IKVServer, Runnable {
                 }
             }
             disk_read.close();
+            lock.unlock();
         } catch (IOException ioe) {
             System.out.println("Trouble Reading file: " + ioe.getMessage());
             outputFile.createNewFile();
@@ -330,6 +335,7 @@ public class KVServer implements IKVServer, Runnable {
                 // need to remove the key from the list
                 String strCurrentLine;
                 try {
+                    lock.lock();
                     BufferedWriter temp_disk_write = new BufferedWriter(new FileWriter(tempFile,true)); //true so that any new data is just appended
                     BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
 
@@ -343,6 +349,7 @@ public class KVServer implements IKVServer, Runnable {
                     temp_disk_write.close();
                     // at end rename file
                     boolean success = tempFile.renameTo(outputFile); //renamed
+                    lock.unlock();
 
 					result = "UPDATE"; //delete successful
                 } catch (IOException e) {
