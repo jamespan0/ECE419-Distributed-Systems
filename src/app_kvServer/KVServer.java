@@ -285,27 +285,31 @@ public class KVServer implements IKVServer, Runnable {
 	}
 
 	@Override
-    public void putKV(String key, String value) throws Exception{
+    public String putKV(String key, String value) throws Exception{
         /*
             strategy:
             1) use map to store data structure
         */
         // Constraint checking for key and value
         if (key.contains(" ")) {
-            return; //ERROR due to whitespace
+            return "ERROR"; //ERROR due to whitespace
         }
 
+		String result = "";		
+
         if (key.getBytes("UTF-8").length > 20) {
-            return; //ERROR due to key length too long
+            return "ERROR"; //ERROR due to key length too long
         }
 
         //120kB is around 122880 bytes
         if (value.getBytes("UTF-8").length > 122880) {
-            return; //ERROR due to value length too long
+            return "ERROR"; //ERROR due to value length too long
         }
 
 
         if (value == null) {
+			result = "ERROR"; //error if deleting non-existent key
+
             // delete key
             if (inCache(key)) {
                 if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
@@ -318,6 +322,8 @@ public class KVServer implements IKVServer, Runnable {
                     // LFU case
                     lfucache.lfu_remove(key);
                 }
+
+				result = "UPDATE"; //delete successful
             }
 
             if (inStorage(key)){
@@ -337,9 +343,12 @@ public class KVServer implements IKVServer, Runnable {
                     temp_disk_write.close();
                     // at end rename file
                     boolean success = tempFile.renameTo(outputFile); //renamed
+
+					result = "UPDATE"; //delete successful
                 } catch (IOException e) {
-                    System.out.println("Error! unalbe to read!");
+                    System.out.println("Error! unable to read!");
                 } 
+
             }
         } else {
             // insert key in cache
@@ -349,9 +358,14 @@ public class KVServer implements IKVServer, Runnable {
                 if (this.cache_FIFO == null) {
                     System.out.println("ERROR: cache_FIFO is null");
                 }
+				if (this.cache_FIFO.containsKey(key)) {
+					result = "UPDATE";
+				} else {
+					result = "SUCCESS";
+				}
                 this.cache_FIFO.put(key,value);
                 System.out.println("After FIFO Value");
-                // print stuff ou
+                // print stuff out
                 for (Map.Entry<String, String> entry : cache_FIFO.entrySet()) {
                     String mapvalue = entry.getValue();
                     String mapkey = entry.getKey();
@@ -361,9 +375,19 @@ public class KVServer implements IKVServer, Runnable {
 
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
+				if (cache_LRU.containsKey(key)) {
+					result = "UPDATE";
+				} else {
+					result = "SUCCESS";
+				}
                 cache_LRU.put(key,value);
             } else {
                 // LFU case
+				if (lfucache.lfu_containsKey(key)) {
+					result = "UPDATE";
+				} else {
+					result = "SUCCESS";
+				}
                 System.out.println("Before LFU Value");
                 lfucache.lfu_put(key,value);
             }
@@ -377,6 +401,8 @@ public class KVServer implements IKVServer, Runnable {
             }
 
         }
+
+		return result;
 
 
 	}
