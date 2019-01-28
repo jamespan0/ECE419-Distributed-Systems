@@ -75,12 +75,9 @@ public class ClientConnection implements Runnable {
 					synchronized(server) {
 						value = server.getKV(stringArray[1]);
 					}
-
-					if(false) {  //NEEDS ERROR LOGIC IN GETKV 
-						sendMessage(new TextMessage("GET_ERROR " + stringArray[1]));
-					} else {
-						sendMessage(new TextMessage("GET_SUCCESS " + stringArray[1] + " "+ value));
-					}
+						
+					sendMessage(new TextMessage("GET_SUCCESS " + stringArray[1] + " "+ value));
+					
 				} catch (Exception e) {
 					logger.error("Error: GET command unsuccessful!", e);
 				}

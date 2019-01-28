@@ -164,7 +164,7 @@ public class KVServer implements IKVServer, Runnable {
 	
 	@Override
 	public int getPort(){
-		return this.port;
+		return serverSocket.getLocalPort();
 	}
 
 	@Override	
@@ -321,7 +321,7 @@ public class KVServer implements IKVServer, Runnable {
         }
 
 
-        if (value == null) {
+        if (value == "null") {
 			result = "ERROR"; //error if deleting non-existent key
             System.out.println("TEST GOES INTO VALUE EQUALS NULL");
 
