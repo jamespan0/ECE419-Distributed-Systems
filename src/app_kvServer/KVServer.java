@@ -15,6 +15,7 @@ import java.io.FileReader;
 import java.io.FileNotFoundException;
 import java.util.Map;
 import java.util.LinkedHashMap;
+import java.util.concurrent.locks.*;
 
 import logger.LogSetup;
 
@@ -74,6 +75,7 @@ public class KVServer implements IKVServer, Runnable {
     private BufferedWriter disk_write;
     private BufferedWriter temp_disk_write;
     private BufferedReader disk_read;
+    private Lock lock =  new ReentrantLock();
 //    private LinkedHashMap<String, String> cache_LFU;     //data structure for cache_LFU case
 
     /*     END OF DATA STRUCTURES FOR KEY VALUE STORAGE                */
@@ -207,7 +209,7 @@ public class KVServer implements IKVServer, Runnable {
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
-            BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
+            lock.lock();
             BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
 
             while ((strCurrentLine = disk_read.readLine()) != null) {
@@ -217,6 +219,7 @@ public class KVServer implements IKVServer, Runnable {
                 }
             }
             disk_read.close();
+            lock.unlock();
         } catch (IOException e) {
 			System.out.println("Error! unable to read/write!");
 		} 
@@ -248,34 +251,49 @@ public class KVServer implements IKVServer, Runnable {
             return "ERROR"; //ERROR due to key length too long
         }
 
+        if (key.contains(" ")) {
+            return "ERROR" ; //ERROR due to whitespace
+        }
+        
+
         if (inCache(key)) {
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // FIFO case
-                return this.cache_FIFO.get(key);
+                lock.lock();
+                String value = cache_FIFO.get(key);
+                lock.unlock();
+                return value;
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
-                return cache_LRU.get(key);
+                lock.lock();
+                String value = cache_LRU.get(key);
+                lock.unlock();
+                return value;
             } else {
                 // LFU case
-                return lfucache.lfu_get(key);
+                lock.lock();
+                String value = lfucache.lfu_get(key);
+                lock.unlock();
+                return value;
             }
         }
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
-            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+            lock.lock();
+            disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+            while ((strCurrentLine = disk_read.readLine()) != null) {
+                String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
+                if (keyValue[0].equals(key)) {
+                    return keyValue[1];
+                }
+            }
+            disk_read.close();
+            lock.unlock();
         } catch (IOException ioe) {
             System.out.println("Trouble Reading file: " + ioe.getMessage());
             outputFile.createNewFile();
         }
-
-        while ((strCurrentLine = disk_read.readLine()) != null) {
-            String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
-            if (keyValue[0].equals(key)) {
-                return keyValue[1];
-            }
-        }
-        disk_read.close();
 
 		return "ERROR_NO_KEY_FOUND";
 	}
@@ -287,6 +305,9 @@ public class KVServer implements IKVServer, Runnable {
             1) use map to store data structure
         */
         // Constraint checking for key and value
+        if (key.contains(" ")) {
+            return "ERROR"; //ERROR due to whitespace
+        }
 
 		String result = "";		
 
@@ -299,7 +320,6 @@ public class KVServer implements IKVServer, Runnable {
             return "ERROR"; //ERROR due to value length too long
         }
 
-        System.out.println("Entering");
 
         if (value == "null") {
 			result = "ERROR"; //error if deleting non-existent key
@@ -308,13 +328,19 @@ public class KVServer implements IKVServer, Runnable {
             if (inCache(key)) {
                 if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                     // FIFO case
+                    lock.lock();
                     this.cache_FIFO.remove(key);
+                    lock.unlock();
                 } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                     // LRU case
+                    lock.lock();
                     cache_LRU.remove(key);
+                    lock.unlock();
                 } else {
                     // LFU case
+                    lock.lock();
                     lfucache.lfu_remove(key);
+                    lock.unlock();
                 }
 
 				result = "UPDATE"; //delete successful
@@ -324,6 +350,7 @@ public class KVServer implements IKVServer, Runnable {
                 // need to remove the key from the list
                 String strCurrentLine;
                 try {
+                    lock.lock();
                     BufferedWriter temp_disk_write = new BufferedWriter(new FileWriter(tempFile,true)); //true so that any new data is just appended
                     BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
 
@@ -337,6 +364,7 @@ public class KVServer implements IKVServer, Runnable {
                     temp_disk_write.close();
                     // at end rename file
                     boolean success = tempFile.renameTo(outputFile); //renamed
+                    lock.unlock();
 
 					result = "UPDATE"; //delete successful
                 } catch (IOException e) {
@@ -357,15 +385,20 @@ public class KVServer implements IKVServer, Runnable {
 				} else {
 					result = "SUCCESS";
 				}
+                lock.lock();
                 this.cache_FIFO.put(key,value);
+                lock.unlock();
                 System.out.println("After FIFO Value");
                 // print stuff out
+                /*
+                DEBUG purposes
                 for (Map.Entry<String, String> entry : cache_FIFO.entrySet()) {
                     String mapvalue = entry.getValue();
                     String mapkey = entry.getKey();
                     //Do something
                     System.out.println("System key: " + mapkey + " with value: " + mapvalue);
                  }
+                 */
 
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
@@ -374,7 +407,9 @@ public class KVServer implements IKVServer, Runnable {
 				} else {
 					result = "SUCCESS";
 				}
+                lock.lock();
                 cache_LRU.put(key,value);
+                lock.unlock();
             } else {
                 // LFU case
 				if (lfucache.lfu_containsKey(key)) {
@@ -382,16 +417,19 @@ public class KVServer implements IKVServer, Runnable {
 				} else {
 					result = "SUCCESS";
 				}
-                System.out.println("Before LFU Value");
+                lock.lock();
                 lfucache.lfu_put(key,value);
+                lock.unlock();
             }
 
             // insert key in storage
             if (!inStorage(key)) {
+                lock.lock();
                 BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
                 String diskEntry = key + " " + value + "\n" ;
                 disk_write.write(diskEntry);
                 disk_write.close();
+                lock.unlock();
             }
 
         }
@@ -407,13 +445,19 @@ public class KVServer implements IKVServer, Runnable {
 		// TODO Auto-generated method stub
         if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
             // FIFO case
+            lock.lock();
             cache_FIFO.clear();
+            lock.unlock();
         } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
             // LRU case
+            lock.lock();
             cache_LRU.clear();
+            lock.unlock();
         } else {
             // LFU case
+            lock.lock();
             lfucache.lfu_clear();
+            lock.unlock();
         }
 
 	}
@@ -424,8 +468,10 @@ public class KVServer implements IKVServer, Runnable {
             clearCache();        //clear the cache
             //delete memory file on disk
             try {
+                lock.lock();
                 outputFile.delete();
                 outputFile.createNewFile();
+                lock.unlock();
             } catch (IOException ioe) {
                 System.out.println("Trouble deleting/creating file: " + ioe.getMessage());
             }
