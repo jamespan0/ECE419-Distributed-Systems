@@ -248,10 +248,15 @@ public class KVServer implements IKVServer, Runnable {
             return "ERROR"; //ERROR due to key length too long
         }
 
+        if (key.contains(" ")) {
+            return "ERROR" ; //ERROR due to whitespace
+        }
+        
+
         if (inCache(key)) {
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // FIFO case
-                return this.cache_FIFO.get(key);
+                return cache_FIFO.get(key);
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
                 return cache_LRU.get(key);
@@ -263,19 +268,18 @@ public class KVServer implements IKVServer, Runnable {
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
-            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+            disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+            while ((strCurrentLine = disk_read.readLine()) != null) {
+                String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
+                if (keyValue[0].equals(key)) {
+                    return keyValue[1];
+                }
+            }
+            disk_read.close();
         } catch (IOException ioe) {
             System.out.println("Trouble Reading file: " + ioe.getMessage());
             outputFile.createNewFile();
         }
-
-        while ((strCurrentLine = disk_read.readLine()) != null) {
-            String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
-            if (keyValue[0].equals(key)) {
-                return keyValue[1];
-            }
-        }
-        disk_read.close();
 
 		return "ERROR_NO_KEY_FOUND";
 	}
@@ -287,6 +291,10 @@ public class KVServer implements IKVServer, Runnable {
             1) use map to store data structure
         */
         // Constraint checking for key and value
+        if (key.contains(" ")) {
+            return; //ERROR due to whitespace
+        }
+
         if (key.getBytes("UTF-8").length > 20) {
             return; //ERROR due to key length too long
         }
@@ -296,7 +304,6 @@ public class KVServer implements IKVServer, Runnable {
             return; //ERROR due to value length too long
         }
 
-        System.out.println("Entering");
 
         if (value == null) {
             // delete key
