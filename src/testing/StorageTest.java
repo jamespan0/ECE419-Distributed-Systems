@@ -65,24 +65,8 @@ public class StorageTest extends TestCase {
 		assertTrue(app.inStorage("3") && !app.inCache("3"));
 	}
 
-/*
-    @Test
-	public void testGet() {
-        KVServer app = new KVServer(1190,3,"LFU");
-		Exception ex = null;
-        String newString = "";
-        new Thread(app).start();
-		try {
-			app.putKV("0", "1");
-            app.putKV("2", "1");
-            app.putKV("2", "1");
-            newString = app.getKV("3");
-		} catch (Exception e) {
-		    ex = e;	
-		}
-		assertTrue(newString.equals("ERROR_NO_KEY_FOUND"));
-	}
-    */
+
+
 }
 
 
