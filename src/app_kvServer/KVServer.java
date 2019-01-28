@@ -66,7 +66,7 @@ public class KVServer implements IKVServer, Runnable {
             return size() > getCacheSize(); 
         } 
     }; 
-    private LFUCache lfucache = new LFUCache(getCacheSize());
+    private LFUCache lfucache;
     private File outputFile = new File(filename);
     private File tempFile = new File(tempname);
 
@@ -123,7 +123,7 @@ public class KVServer implements IKVServer, Runnable {
         }
         else if (strategy.equals("LFU")) {
             this.cacheStrategy = IKVServer.CacheStrategy.LFU;
-            //LFUCache lfucache = new LFUCache(getCacheSize());
+            this.lfucache = new LFUCache(getCacheSize());
         }
         else if (strategy.equals("LRU")) {
             this.cacheStrategy = IKVServer.CacheStrategy.LRU;
@@ -196,9 +196,13 @@ public class KVServer implements IKVServer, Runnable {
 
 	@Override
     public boolean inStorage(String key){
+
+    /*
         if (inCache(key)) {
             return true ;
         }
+
+    */
 
         // iterate through memory to see if located in disk
         String strCurrentLine;
@@ -353,14 +357,17 @@ public class KVServer implements IKVServer, Runnable {
                 cache_LRU.put(key,value);
             } else {
                 // LFU case
+                System.out.println("Before LFU Value");
                 lfucache.lfu_put(key,value);
             }
 
             // insert key in storage
-            BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
-            String diskEntry = key + " " + value + "\n" ;
-            disk_write.write(diskEntry);
-            disk_write.close();
+            if (!inStorage(key)) {
+                BufferedWriter disk_write = new BufferedWriter(new FileWriter(outputFile,true)); //true so that any new data is just appended
+                String diskEntry = key + " " + value + "\n" ;
+                disk_write.write(diskEntry);
+                disk_write.close();
+            }
 
         }
 
