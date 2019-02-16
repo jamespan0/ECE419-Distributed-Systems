@@ -72,6 +72,7 @@ public class ClientConnection implements Runnable {
 
 					String value;
 
+
 					synchronized(server) {
 						value = server.getKV(stringArray[1]);
 					}
