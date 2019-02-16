@@ -43,6 +43,8 @@ public class KVServer implements IKVServer, Runnable {
 	private ServerSocket serverSocket;
 
 	private boolean running = false;
+	public boolean activated = true;
+	public boolean writeLock = false;
 
 	private int port;
 	private int cacheSize;
@@ -104,8 +106,6 @@ public class KVServer implements IKVServer, Runnable {
             } catch (IOException ioe) {
                 System.out.println("Trouble creating file: " + ioe.getMessage());
             }
-        } catch (IOException ioe) {
-            System.out.println("Trouble reading from the file: " + ioe.getMessage());
         }
 
         if (strategy.equals("FIFO")) {
@@ -149,6 +149,40 @@ public class KVServer implements IKVServer, Runnable {
             */
         }
         
+	}
+
+	public void initKVServer() {
+
+	}
+
+	public void start() {
+		activated = true;
+	}
+
+	public void stop() {
+		activated = false;
+	}
+
+	public void shutDown() {
+
+	}
+
+	public void lockWrite() {
+		writeLock = true;
+	}
+
+	public void unLockWrite() {
+		writeLock = false;
+	}
+
+	public void moveData() {
+
+
+	}
+
+	public void update() {
+
+
 	}
 
     public LinkedHashMap<String, String> getFIFO() {

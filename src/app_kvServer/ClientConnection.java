@@ -19,8 +19,6 @@ public class ClientConnection implements Runnable {
 	KVServer server;
 
 	private static Logger logger = Logger.getRootLogger();
-
-	private boolean activated = false;
 	
 	private boolean isOpen;
 	private static final int BUFFER_SIZE = 1024;
@@ -46,19 +44,22 @@ public class ClientConnection implements Runnable {
 		switch (stringArray[0]) {
 			case ("put"):	
 				try {
-					if(activated) {
+					if(server.activated) {
 						logger.info("PUT_KV \t<" 
 								+ clientSocket.getInetAddress().getHostAddress() + ":" 
 								+ clientSocket.getPort() + ">: 'PUT<" 
 								+ stringArray[1] + "," + stringArray[2] +">'");
+						if (server.writeLock) {
+							sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
+						} else {
+							String result;
 
-						String result;
+							synchronized(server) {
+								result = server.putKV(stringArray[1], stringArray[2]);
+							}
 
-						synchronized(server) {
-							result = server.putKV(stringArray[1], stringArray[2]);
+							sendMessage(new TextMessage("PUT_" + result + " " + stringArray[1] + " "+ stringArray[2]));
 						}
-
-						sendMessage(new TextMessage("PUT_" + result + " " + stringArray[1] + " "+ stringArray[2]));
 					} else {
 						sendMessage(new TextMessage("SERVER_STOPPED"));
 					}
@@ -71,7 +72,7 @@ public class ClientConnection implements Runnable {
 
 			case ("get"):
 				try {
-					if(activated) {
+					if(server.activated) {
 						logger.info("GET_KV \t<" 
 								+ clientSocket.getInetAddress().getHostAddress() + ":" 
 								+ clientSocket.getPort() + ">: 'GET<" 
@@ -103,9 +104,9 @@ public class ClientConnection implements Runnable {
 							+ stringArray[1] + " " + stringArray[2] + "'");
 
 					if (stringArray[1] == "REMOVE") {
-						activated = false;
+						server.stop();
 					} else if (stringArray[1] == "START") {
-						activated = true;
+						server.start();
 					}
 					
 				} catch (Exception e) {

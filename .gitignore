@@ -7,7 +7,9 @@ logs/
 #ignore manifest files
 *.MF
 *.data
-m1-client.jar
-m1-server.jar
+m2-client.jar
+m2-server.jar
+m2-ecs.jar
 /nbproject/private/
 /build/
+/zookeeper-3.4.11
