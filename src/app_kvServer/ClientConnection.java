@@ -19,6 +19,8 @@ public class ClientConnection implements Runnable {
 	KVServer server;
 
 	private static Logger logger = Logger.getRootLogger();
+
+	private boolean activated = false;
 	
 	private boolean isOpen;
 	private static final int BUFFER_SIZE = 1024;
@@ -44,18 +46,22 @@ public class ClientConnection implements Runnable {
 		switch (stringArray[0]) {
 			case ("put"):	
 				try {
-					logger.info("PUT_KV \t<" 
-							+ clientSocket.getInetAddress().getHostAddress() + ":" 
-							+ clientSocket.getPort() + ">: 'PUT<" 
-							+ stringArray[1] + "," + stringArray[2] +">'");
+					if(activated) {
+						logger.info("PUT_KV \t<" 
+								+ clientSocket.getInetAddress().getHostAddress() + ":" 
+								+ clientSocket.getPort() + ">: 'PUT<" 
+								+ stringArray[1] + "," + stringArray[2] +">'");
 
-					String result;
+						String result;
 
-					synchronized(server) {
-						result = server.putKV(stringArray[1], stringArray[2]);
+						synchronized(server) {
+							result = server.putKV(stringArray[1], stringArray[2]);
+						}
+
+						sendMessage(new TextMessage("PUT_" + result + " " + stringArray[1] + " "+ stringArray[2]));
+					} else {
+						sendMessage(new TextMessage("SERVER_STOPPED"));
 					}
-
-					sendMessage(new TextMessage("PUT_" + result + " " + stringArray[1] + " "+ stringArray[2]));
 
 				} catch (Exception e) {
 					logger.error("Error: PUT command unsuccessful!", e);
@@ -65,22 +71,45 @@ public class ClientConnection implements Runnable {
 
 			case ("get"):
 				try {
-					logger.info("GET_KV \t<" 
-							+ clientSocket.getInetAddress().getHostAddress() + ":" 
-							+ clientSocket.getPort() + ">: 'GET<" 
-							+ stringArray[1] +">'");
+					if(activated) {
+						logger.info("GET_KV \t<" 
+								+ clientSocket.getInetAddress().getHostAddress() + ":" 
+								+ clientSocket.getPort() + ">: 'GET<" 
+								+ stringArray[1] +">'");
 
-					String value;
+						String value;
 
 
-					synchronized(server) {
-						value = server.getKV(stringArray[1]);
-					}
+						synchronized(server) {
+							value = server.getKV(stringArray[1]);
+						}
 						
-					sendMessage(new TextMessage("GET_SUCCESS " + stringArray[1] + " "+ value));
+						sendMessage(new TextMessage("GET_SUCCESS " + stringArray[1] + " "+ value));
+					} else {
+						sendMessage(new TextMessage("SERVER_STOPPED"));
+					}
 					
 				} catch (Exception e) {
 					logger.error("Error: GET command unsuccessful!", e);
+				}
+
+				break;
+
+			case ("ECS"):
+				try {
+					logger.info("ECS Message \t<" 
+							+ clientSocket.getInetAddress().getHostAddress() + ":" 
+							+ clientSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[1] + " " + stringArray[2] + "'");
+
+					if (stringArray[1] == "REMOVE") {
+						activated = false;
+					} else if (stringArray[1] == "START") {
+						activated = true;
+					}
+					
+				} catch (Exception e) {
+					logger.error("Error: ECS command unsuccessful!", e);
 				}
 
 				break;
