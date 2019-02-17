@@ -25,6 +25,7 @@ import client.KVCommInterface;
 import client.KVStore;
 
 import shared.messages.TextMessage;
+import shared.messages.AdminMessage;
 
 public class KVServer implements IKVServer, Runnable {
 	/**
@@ -43,6 +44,7 @@ public class KVServer implements IKVServer, Runnable {
 	private ServerSocket serverSocket;
 
 	private boolean running = false;
+
 	public boolean activated = true;
 	public boolean writeLock = false;
 
@@ -151,7 +153,7 @@ public class KVServer implements IKVServer, Runnable {
         
 	}
 
-	public void initKVServer() {
+	public void initKVServer(int metadata, int cacheSize, String strategy) {
 
 	}
 
@@ -164,7 +166,8 @@ public class KVServer implements IKVServer, Runnable {
 	}
 
 	public void shutDown() {
-
+		clearCache();
+		close();
 	}
 
 	public void lockWrite() {

@@ -72,17 +72,11 @@ public class TextMessage implements KVMessage, Serializable {
         @Override public String getValue() {
             
             String[] tokens = getMsg().split("\\s+");
-            
-            // should not have more than 3 parameters
-            if (tokens.length > 3) {
-                return null;
-            }
-            
-            if (tokens.length == 2 || tokens.length == 3) {
+
+            if (tokens.length == 3) {
                 // it's either PUT <key> <value>
-                // or <STATUS> <key> (<value>)
-                // or GET <key>
-                return tokens[1];
+                // or <STATUS> <key> <value>
+                return tokens[2];
             }
             
             // tokens.length < 2
