@@ -2,7 +2,6 @@ package app_kvECS;
 
 import java.util.Map;
 import java.util.Collection;
-import app_kvECS.CircularLinkedList;
 import java.util.ArrayList;
 import java.util.Arrays;
 
@@ -10,6 +9,8 @@ import java.io.IOException;
 
 import ecs.ECSNode;
 import ecs.IECSNode;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 public class ECSClient implements IECSClient {
 
@@ -35,7 +36,9 @@ public class ECSClient implements IECSClient {
         
         Collection<IECSNode> _nodes = setupNodes(1, cacheStrategy, cacheSize);
         IECSNode old_node = ((IECSNode[])_nodes.toArray())[0];
-        ECSNode _node = new ECSNode(old_node.getNodeName(), old_node.getNodeHost() , old_node.getNodePort(), hash_range);
+        String name = old_node.getNodeName();
+        if (name.equals("TEST_USE_HASH")) name = hash_range[1];
+        ECSNode _node = new ECSNode(name, old_node.getNodeHost() , old_node.getNodePort(), hash_range);
         
         // initiate ssh call
         Process proc;
@@ -139,6 +142,7 @@ public class ECSClient implements IECSClient {
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         int port = 0;
+        // to have hash as the name put "TEST_USE_HASH"
         IECSNode _node = (IECSNode) new ECSNode("TEST_USE_HASH", "127.0.0.1", port, null);
         ArrayList<IECSNode> _nodes = new ArrayList<IECSNode>();
         _nodes.add(_node);
@@ -166,7 +170,7 @@ public class ECSClient implements IECSClient {
 
     @Override
     public Map<String, IECSNode> getNodes() {
-        return null;
+        return nodes;
     }
 
     @Override
@@ -174,7 +178,67 @@ public class ECSClient implements IECSClient {
         return null;
     }
 
+    // INTERFACE
+    private static final String PROMPT = "StorageClient> ";
+    private BufferedReader stdin;
+    private boolean stop = false;
+    
+    private void handleCommand(String cmdLine) {
+        
+                String[] tokens = cmdLine.split("\\s+");
+
+                switch (tokens[0]) {
+
+                    case "quit":
+                        stop = true;
+                        System.out.println(PROMPT + "Application exit!");
+                        break;
+
+                    case "help":
+                        printHelp();
+                        break;
+
+                    default:
+                        printError("Unknown command");
+                        printHelp();
+                        break;
+                }
+    }
+    
+    public void run() {
+                while(!stop) {
+                        stdin = new BufferedReader(new InputStreamReader(System.in));
+                        System.out.print(PROMPT);
+
+                        try {
+                                String cmdLine = stdin.readLine();
+                                this.handleCommand(cmdLine);
+                        } catch (IOException e) {
+                                stop = true;
+                                printError("CLI does not respond - Application terminated ");
+                        }
+                }
+    }
+    
+    private void printError(String error){
+                System.out.println(PROMPT + "Error! " +  error);
+    }
+    
+    private void printHelp() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("HELP (Usage):\n");
+                sb.append("::::::::::::::::::::::::::::::::");
+                sb.append("::::::::::::::::::::::::::::::::\n");
+                sb.append("addNode ");
+                sb.append("\t adds a node\n");
+
+                sb.append("quit ");
+                sb.append("\t\t\t exits the program");
+                System.out.println(sb.toString());
+    }
+    
     public static void main(String[] args) {
-        System.out.println("testing");
+                ECSClient app = new ECSClient();
+                app.run();
     }
 }
