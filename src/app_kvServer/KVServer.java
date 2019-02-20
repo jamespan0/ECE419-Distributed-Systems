@@ -25,7 +25,6 @@ import client.KVCommInterface;
 import client.KVStore;
 
 import shared.messages.TextMessage;
-import shared.messages.AdminMessage;
 
 public class KVServer implements IKVServer, Runnable {
 	/**
