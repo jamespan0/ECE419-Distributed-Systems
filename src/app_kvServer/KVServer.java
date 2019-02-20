@@ -17,6 +17,9 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.concurrent.locks.*;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+import ecs.IECSNode;
 
 import logger.LogSetup;
 
@@ -75,18 +78,26 @@ public class KVServer implements IKVServer, Runnable {
 
     /*  M2 variables start  */
 
+    private int m2_port;
+    private int m2_cachesize;
+    private StringBuffer stringBuffer;  //hash of server
+
 	private boolean running = false;
 	public boolean activated = true;
 	public boolean writeLock = false;
-
-    public serverTypes {
-        SERVER_EXIT,    //do not process ECS nor client requests, server shut down
-        SERVER_STOPPED, //block all client requests, only process ECS
-        SERVER_RUN    // all client and ECS requests are processed
-    }
-
-
     private serverTypes serverStatus;
+    private String servername;
+
+
+/*
+    public enum serverTypes {
+        SERVER_WRITE_LOCK,    //do not process ECS nor client requests, server shut down
+        SERVER_STOPPED, //block all client requests, only process ECS
+        SERVER_    // all client and ECS requests are processed
+    }
+*/
+
+
 
 
 
@@ -137,10 +148,27 @@ public class KVServer implements IKVServer, Runnable {
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(String metadata, int cacheSize, String replacementStrategy) {
+	public void initKVServer(String metadata, int cacheSize, String strategy) {
     //need to figure out how to get metadata
-        serverStatus = SERVER_STOPPED;
-        
+        this.m2_cachesize = cacheSize;
+        serverStatus = serverTypes.SERVER_STOPPED;
+        activated = false ;
+        writeLock = false ;
+
+
+        MessageDigest messageDigest;
+        try {
+            messageDigest = MessageDigest.getInstance("MD5");
+            messageDigest.update(metadata.getBytes());
+            byte[] messageDigestMD5 = messageDigest.digest();
+            this.stringBuffer = new StringBuffer();
+            for(byte bytes : messageDigestMD5) {
+                this.stringBuffer.append(String.format("%02x",bytes & 0xff));
+            } 
+        } catch(NoSuchAlgorithmException exception) {
+            exception.printStackTrace(); 
+        }
+
 
 	}
 
@@ -153,7 +181,8 @@ public class KVServer implements IKVServer, Runnable {
 	}
 
 	public void shutDown() {
-
+		clearCache();
+		close();
 	}
 
 	public void lockWrite() {
@@ -165,6 +194,8 @@ public class KVServer implements IKVServer, Runnable {
 	}
 
 	public void moveData() {
+
+    // move data 
 
 
 	}
@@ -220,17 +251,10 @@ public class KVServer implements IKVServer, Runnable {
 	@Override
     public boolean inStorage(String key){
 
-    /*
-        if (inCache(key)) {
-            return true ;
-        }
-
-    */
-
         // iterate through memory to see if located in disk
         String strCurrentLine;
         try {
-            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); //true so that any new data is just appended
+            BufferedReader disk_read = new BufferedReader(new FileReader(outputFile)); 
 
             while ((strCurrentLine = disk_read.readLine()) != null) {
                 String[] keyValue = strCurrentLine.split(" "); // keyValue[0] is the key
@@ -394,15 +418,6 @@ public class KVServer implements IKVServer, Runnable {
                 this.cache_FIFO.put(key,value);
                 System.out.println("After FIFO Value");
                 // print stuff out
-                /*
-                DEBUG purposes
-                for (Map.Entry<String, String> entry : cache_FIFO.entrySet()) {
-                    String mapvalue = entry.getValue();
-                    String mapkey = entry.getKey();
-                    //Do something
-                    System.out.println("System key: " + mapkey + " with value: " + mapvalue);
-                 }
-                 */
 
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // LRU case
