@@ -85,7 +85,7 @@ public class KVServer implements IKVServer, Runnable {
     private int m2_cachesize;
     private StringBuffer stringBuffer;  //hash of tuple encrypted
     // int to store ports, string stores map
-    private TreeMap <int, String[]> metadata = new TreeMap<int, String[]>();
+    private TreeMap <Integer, String[]> metadata = new TreeMap<Integer, String[]>();
 
 	private boolean running = false;
 	public boolean activated = true;
