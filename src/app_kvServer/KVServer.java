@@ -7,6 +7,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.TreeMap;
 import java.io.BufferedWriter;
 import java.io.BufferedReader;
 import java.io.File;
@@ -18,6 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.concurrent.locks.*;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import ecs.IECSNode;
+
 
 import ecs.IECSNode;
 
@@ -80,12 +83,14 @@ public class KVServer implements IKVServer, Runnable {
 
     private int m2_port;
     private int m2_cachesize;
-    private StringBuffer stringBuffer;  //hash of server
+    private StringBuffer stringBuffer;  //hash of tuple encrypted
+    // int to store ports, string stores map
+    private TreeMap <int, String[]> metadata = new TreeMap<int, String[]>();
 
 	private boolean running = false;
 	public boolean activated = true;
 	public boolean writeLock = false;
-    private serverTypes serverStatus;
+//    private serverTypes serverStatus;
     private String servername;
 
 
@@ -98,11 +103,9 @@ public class KVServer implements IKVServer, Runnable {
 */
 
 
-
-
-
     /*  M2 variables end */
 
+    //M1 KVServer
 	public KVServer(int port, int cacheSize, String strategy) {
         this.port = port;
         this.cacheSize = cacheSize;
@@ -142,20 +145,28 @@ public class KVServer implements IKVServer, Runnable {
         else {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
         }
+
+
+
+
+        //run initKVServer at end
+
+
+        initKVServer(port,cacheSize,strategy);
         
 	}
 
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(String metadata, int cacheSize, String strategy) {
+	public void initKVServer(int port, int cacheSize, String strategy) {
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
-        serverStatus = serverTypes.SERVER_STOPPED;
+//        serverStatus = serverTypes.SERVER_STOPPED;
         activated = false ;
         writeLock = false ;
 
-
+/*
         MessageDigest messageDigest;
         try {
             messageDigest = MessageDigest.getInstance("MD5");
@@ -169,8 +180,11 @@ public class KVServer implements IKVServer, Runnable {
             exception.printStackTrace(); 
         }
 
+        decrypt(stringBuffer);
+*/
 
 	}
+
 
 	public void start() {
 		activated = true;
