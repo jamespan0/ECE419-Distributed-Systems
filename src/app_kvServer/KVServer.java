@@ -222,8 +222,6 @@ public class KVServer implements IKVServer, Runnable {
             return;
         }
 
-        Integer lower = Integer.valueOf(range[0]);
-        Integer higher = Integer.valueOf(range[1]);
         ArrayList<String> removal = new ArrayList<String>();
         // movehash gives integer in metadata for range of hashes selected for this server
         Integer moveHash = hashing(server);
@@ -235,6 +233,9 @@ public class KVServer implements IKVServer, Runnable {
             /*
             Steps to move data from range to other range
             */
+            String[] target = metadata.get(moveHash).getNodeHashRange();
+            Integer lower = Integer.valueOf(target[0]);
+            Integer higher = Integer.valueOf(target[1]);
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // cache_FIFO
                 for (String key : cache_FIFO.keySet()) {
