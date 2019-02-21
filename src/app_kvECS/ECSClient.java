@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import java.io.IOException;
 
@@ -25,6 +26,10 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     @Override
     public boolean start() {
+        if (nodes.isEmpty()) {
+            System.out.println(PROMPT + "No Nodes!");
+            return false;
+        }
         for (IECSNode node : nodes.values()) {
             sendMessage(node, "start");
         }
@@ -33,6 +38,10 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 
     @Override
     public boolean stop() {
+        if (nodes.isEmpty()) {
+            System.out.println(PROMPT + "No Nodes!");
+            return false;
+        }
         for (IECSNode node : nodes.values()) {
             sendMessage(node, "stop");
         }
@@ -51,14 +60,14 @@ public class ECSClient implements IECSClient, ClientSocketListener {
         int port = 0;
         
         Collection<IECSNode> _nodes = setupNodes(1, cacheStrategy, cacheSize);
-        IECSNode old_node = ((IECSNode[])_nodes.toArray())[0];
+        IECSNode old_node = (IECSNode) (_nodes.toArray())[0];
         String name = old_node.getNodeName();
         if (name.equals("TEST_USE_HASH")) name = hash_range[1];
         ECSNode _node = new ECSNode(name, old_node.getNodeHost() , old_node.getNodePort(), hash_range);
         
         // initiate ssh call
         Process proc;
-        String script = "ssh -n 127.0.0.1 nohup java -jar ms2-server.jar 50000 ERROR &";
+        String script = "ssh -n " + _node.getNodeHost() + " nohup java -jar m2-server.jar " + _node.getNodePort() + " 50000 FIFO &";
 
         Runtime run = Runtime.getRuntime();
         try {
@@ -304,7 +313,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
                             break;
                         }
                         
-                        addNodes(Integer.parseInt(tokens[0], 10), tokens[2], Integer.parseInt(tokens[1], 10));
+                        addNodes(Integer.parseInt(tokens[1], 10), tokens[3], Integer.parseInt(tokens[2], 10));
                         break;
                         
                     case "removeNode":
@@ -323,6 +332,16 @@ public class ECSClient implements IECSClient, ClientSocketListener {
                             break;
                         }
                         
+                        if (nodes == null) {
+                            System.out.println(PROMPT + "No Nodes!");
+                            break;
+                        }
+                        
+                        if (nodes.isEmpty()) {
+                            System.out.println(PROMPT + "No Nodes!");
+                            break;
+                        }
+                        
                         for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
                             IECSNode _node = entry.getValue();
                             System.out.print(PROMPT + "Node: " + entry.getKey() + "\t\tHash Range: " + _node.getNodeHashRange()[0] + "-" + _node.getNodeHashRange()[1]);
@@ -332,12 +351,16 @@ public class ECSClient implements IECSClient, ClientSocketListener {
                         break;   
                         
                     case "shutdown":
-                        if(tokens.length != 1) {
-                            printError("Invalid number of parameters!");
-                            break;
-                        }
                         shutdown();
                         break; 
+                        
+                    case "start":
+                        start();
+                        break;
+                        
+                    case "stop":
+                        stop();
+                        break;
                         
                     default:
                         printError("Unknown command");
@@ -370,7 +393,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
                 sb.append("HELP (Usage):\n");
                 sb.append("::::::::::::::::::::::::::::::::");
                 sb.append("::::::::::::::::::::::::::::::::\n");
-                sb.append("addNode <numberOfNodes>, <cacheSize>, <replacementStrategy>");
+                sb.append("addNodes <numberOfNodes> <cacheSize> <replacementStrategy>");
                 sb.append("\t adds a node\n");
                 sb.append("removeNode <name>");
                 sb.append("\t removes a node\n");
@@ -387,6 +410,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     public static void main(String[] args) {
                 ECSClient app = new ECSClient();
+                app.nodes = new HashMap<String, IECSNode>();
                 app.run();
     }
 }

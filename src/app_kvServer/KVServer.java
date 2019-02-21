@@ -8,7 +8,6 @@ import java.net.UnknownHostException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.TreeMap;
-import java.util.ArrayList;
 import java.io.BufferedWriter;
 import java.io.BufferedReader;
 import java.io.File;
@@ -159,15 +158,11 @@ public class KVServer implements IKVServer, Runnable {
         activated = false ;
         writeLock = false ;
 
-	}
-
-
-    public Integer hashing(String target) {
-
+/*
         MessageDigest messageDigest;
         try {
             messageDigest = MessageDigest.getInstance("MD5");
-            messageDigest.update(target.getBytes());
+            messageDigest.update(metadata.getBytes());
             byte[] messageDigestMD5 = messageDigest.digest();
             this.stringBuffer = new StringBuffer();
             for(byte bytes : messageDigestMD5) {
@@ -176,11 +171,11 @@ public class KVServer implements IKVServer, Runnable {
         } catch(NoSuchAlgorithmException exception) {
             exception.printStackTrace(); 
         }
-        int result = Integer.parseInt(stringBuffer.toString()) %65535;
 
-        return result; 
+        decrypt(stringBuffer);
+*/
 
-    }
+	}
 
 
 	public void start() {
@@ -216,60 +211,22 @@ public class KVServer implements IKVServer, Runnable {
 
 	public void moveData(String[] range, String server) {
 
-        //check if range array is proper
-        if (range.length != 2) {
-            //range of array not proper, return fail to ECS
-            return;
-        }
+    //check if range array is proper
+    if (range.length != 2) {
+        //range of array not proper, return fail to ECS
+        return;
+    }
+    // movehash gives integer in metadata for range of hashes selected for this server
+    Integer moveHash = 0; /* = ECSHASH(server);*/
 
-        ArrayList<String> removal = new ArrayList<String>();
-        // movehash gives integer in metadata for range of hashes selected for this server
-        Integer moveHash = hashing(server);
-
-        if (metadata.get(moveHash) == null) {
-            //Server not allocated, return fail to ECS
-            return;
-        } else {
-            /*
-            Steps to move data from range to other range
-            */
-            String[] target = metadata.get(moveHash).getNodeHashRange();
-            Integer lower = Integer.valueOf(target[0]);
-            Integer higher = Integer.valueOf(target[1]);
-            if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
-                // cache_FIFO
-                for (String key : cache_FIFO.keySet()) {
-                    String newKey = key + ":" + cache_FIFO.get(key);
-                    String moveData = key + " " + cache_FIFO.get(key);
-                    Integer hash = hashing(newKey);
-                    if (hash.intValue() > lower.intValue() && hash.intValue() < higher.intValue()) {
-                        removal.add(moveData); 
-                        //remove data
-                        putKV(key,"null");
-                        //data to be moved
-                    }
-                }
-            } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
-                // cache_LRU
-                for (String key : cache_FIFO.keySet()) {
-                    String newKey = key + ":" + cache_FIFO.get(key);
-                    String moveData = key + " " + cache_FIFO.get(key);
-                    Integer hash = hashing(newKey);
-                    if (hash.intValue() > lower.intValue() && hash.intValue() < higher.intValue()) {
-                        removal.add(moveData); 
-                        putKV(key,"null");
-                        //data to be moved
-                    }
-                }
-            } else {
-                //cache_LFU
-            }
-
-            //add data in removal to new memory
-            //need to communicate
+    if (metadata.get(moveHash) == null) {
+        //Server not allocated, return fail to ECS
+        return;
+    } else {
         
 
-        }   
+    }
+
 
 	}
 
