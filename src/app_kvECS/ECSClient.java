@@ -12,23 +12,39 @@ import ecs.IECSNode;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
-public class ECSClient implements IECSClient {
+import client.KVStore;
+import shared.messages.ClientSocketListener;
+import shared.messages.TextMessage;
 
+public class ECSClient implements IECSClient, ClientSocketListener {
+
+    private static final int HASH_LOWER_BOUND = 0;
+    private static final int HASH_UPPER_BOUND = Integer.parseInt("FFFF", 16);
+    
     private Map<String, IECSNode> nodes;
     
     @Override
     public boolean start() {
-        return false;
+        for (IECSNode node : nodes.values()) {
+            sendMessage(node, "start");
+        }
+        return true;
     }
 
     @Override
     public boolean stop() {
-        return false;
+        for (IECSNode node : nodes.values()) {
+            sendMessage(node, "stop");
+        }
+        return true;
     }
 
     @Override
     public boolean shutdown() {
-        return false;
+        removeAllNodes();
+        stop = true;
+        System.out.println(PROMPT + "Application exit!");
+        return true;
     }
 
     private IECSNode addNodeInternal(String cacheStrategy, int cacheSize, String[] hash_range) {
@@ -69,7 +85,7 @@ public class ECSClient implements IECSClient {
     
     private String[] hash_insert_loc() {
         if (nodes.size() == 0) {
-            String[] range = {"0000", "FFFF"};
+            String[] range = {Integer.toHexString(HASH_LOWER_BOUND), Integer.toHexString(HASH_UPPER_BOUND)};
             return range;
         }
         
@@ -98,7 +114,7 @@ public class ECSClient implements IECSClient {
     
     private int find_circular_gap(int lower, int upper) {
         if (lower > upper) {
-            return upper + hexstr_to_int("FFFF") - lower + 1;
+            return upper + HASH_UPPER_BOUND - lower + 1;
         }
         return upper - lower;
     }
@@ -153,6 +169,10 @@ public class ECSClient implements IECSClient {
     public boolean awaitNodes(int count, int timeout) throws Exception {
         return true;
     }
+    
+    private void shutdownNode(IECSNode node) {
+        sendMessage(node, "shutdown");
+    }
 
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
@@ -160,12 +180,21 @@ public class ECSClient implements IECSClient {
         boolean somenotdeleted = false;
         for (int i=0; i<=nodeNames.size(); i++) {
             
-            boolean deleted = false;
-            nodes.remove(_nodeNames[i]);
+            // attempt deletion
+            if (nodes.containsKey(_nodeNames[i])) {
+                IECSNode _node = nodes.remove(_nodeNames[i]);
+                shutdownNode(_node);
+            }
+            else somenotdeleted = true;
             
-            if (!deleted) somenotdeleted = true;
         }
         return !somenotdeleted;
+    }
+    
+    public void removeAllNodes() {
+        for (IECSNode value: nodes.values())
+            shutdownNode(value);
+        nodes.clear();
     }
 
     @Override
@@ -178,10 +207,86 @@ public class ECSClient implements IECSClient {
         return null;
     }
 
-    // INTERFACE
-    private static final String PROMPT = "StorageClient> ";
-    private BufferedReader stdin;
+    // Network Conenction
+    boolean connected = false;
     private boolean stop = false;
+    private static final String PROMPT = "ECSClient> ";
+    private BufferedReader stdin;
+    
+    public void handleNewMessage(TextMessage msg) {
+		if (connected) {
+                    if(!stop) {
+                        System.out.println("Server reply: " + msg.getMsg());
+                    }
+                    System.out.print(PROMPT);
+                } else {
+
+                    if (msg.getMsg().indexOf("Connection to storage server established:") != 0) {
+                            connected = true;
+                    }
+
+                    System.out.println(msg.getMsg());
+                    System.out.print(PROMPT);
+		}
+    }
+
+    public void handleStatus(ClientSocketListener.SocketStatus status) {
+        
+            /*
+            if(null != status) switch (status) {
+
+            case CONNECTED:
+                break;
+
+            case DISCONNECTED:
+                System.out.print(PROMPT);
+                System.out.println("Connection terminated: ");
+                break;
+
+            case CONNECTION_LOST:
+                System.out.println("Connection lost: "
+                        + serverAddress + " / " + serverPort);
+                System.out.print(PROMPT);
+                break;
+
+            default:
+                break;
+            }
+            */
+
+    }
+        
+    private void sendMessage(IECSNode node, String message) {
+        String address = node.getNodeHost();
+        int port = node.getNodePort();
+        KVStore connection = new KVStore(address, port);
+        try {
+            connection.connect();
+        } catch (Exception e) {
+            printError("Conenction Failed!");
+            return;
+        }
+        
+        connection.addListener(this);
+        connection.start();
+        
+        if(connection.isRunning()) {
+                            
+            try {
+                    connection.sendMessage(new TextMessage(message));
+            } catch (IOException e) {
+                    printError("Unable to send message!");
+                    connection.disconnect();
+                    return;
+            }
+
+        } else {
+            printError("Not connected!");
+            return;
+        }
+    }
+    
+    // INTERFACE
     
     private void handleCommand(String cmdLine) {
         
@@ -189,15 +294,51 @@ public class ECSClient implements IECSClient {
 
                 switch (tokens[0]) {
 
-                    case "quit":
-                        stop = true;
-                        System.out.println(PROMPT + "Application exit!");
-                        break;
-
                     case "help":
                         printHelp();
                         break;
-
+                        
+                    case "addNodes":
+                        if(tokens.length != 4) {
+                            printError("Invalid number of parameters!");
+                            break;
+                        }
+                        
+                        addNodes(Integer.parseInt(tokens[0], 10), tokens[2], Integer.parseInt(tokens[1], 10));
+                        break;
+                        
+                    case "removeNode":
+                        if(tokens.length != 2) {
+                            printError("Invalid number of parameters!");
+                            break;
+                        }
+                        ArrayList<String> list = new ArrayList<String>();
+                        list.add(tokens[1]);
+                        removeNodes(list);
+                        break;
+                        
+                    case "list":
+                        if(tokens.length != 1) {
+                            printError("Invalid number of parameters!");
+                            break;
+                        }
+                        
+                        for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
+                            IECSNode _node = entry.getValue();
+                            System.out.print(PROMPT + "Node: " + entry.getKey() + "\t\tHash Range: " + _node.getNodeHashRange()[0] + "-" + _node.getNodeHashRange()[1]);
+                            System.out.println("\t\tHost: " + entry.getValue().getNodeName() + ":" + entry.getValue().getNodePort());
+                        }
+                        
+                        break;   
+                        
+                    case "shutdown":
+                        if(tokens.length != 1) {
+                            printError("Invalid number of parameters!");
+                            break;
+                        }
+                        shutdown();
+                        break; 
+                        
                     default:
                         printError("Unknown command");
                         printHelp();
@@ -229,11 +370,18 @@ public class ECSClient implements IECSClient {
                 sb.append("HELP (Usage):\n");
                 sb.append("::::::::::::::::::::::::::::::::");
                 sb.append("::::::::::::::::::::::::::::::::\n");
-                sb.append("addNode ");
+                sb.append("addNode <numberOfNodes>, <cacheSize>, <replacementStrategy>");
                 sb.append("\t adds a node\n");
-
-                sb.append("quit ");
-                sb.append("\t\t\t exits the program");
+                sb.append("removeNode <name>");
+                sb.append("\t removes a node\n");
+                sb.append("list");
+                sb.append("\t lists all nodes\n");
+                sb.append("start");
+                sb.append("\t starts all KVServers\n");
+                sb.append("stop");
+                sb.append("\t stops all KVServers\n");
+                sb.append("shutdown");
+                sb.append("\t terminates the entire distributed storage server system.\n");
                 System.out.println(sb.toString());
     }
     
