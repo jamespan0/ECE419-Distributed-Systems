@@ -44,7 +44,7 @@ public class KVServer implements IKVServer, Runnable {
 
 	private boolean running = false;
 
-	public boolean activated = true;
+	public boolean activated = false;
 	public boolean writeLock = false;
 
 	private int port;
@@ -152,16 +152,22 @@ public class KVServer implements IKVServer, Runnable {
         
 	}
 
-	public void initKVServer(int metadata, int cacheSize, String strategy) {
+	public void initKVServer(String metadata, int cacheSize, String strategy) {
 
 	}
 
 	public void start() {
 		activated = true;
+
+		logger.info("Server activated on port: " 
+					+ serverSocket.getLocalPort());
 	}
 
 	public void stop() {
 		activated = false;
+
+		logger.info("Server deactivated on port: " 
+					+ serverSocket.getLocalPort());
 	}
 
 	public void shutDown() {
@@ -171,10 +177,14 @@ public class KVServer implements IKVServer, Runnable {
 
 	public void lockWrite() {
 		writeLock = true;
+
+		logger.info("Server write lock enabled");
 	}
 
 	public void unLockWrite() {
 		writeLock = false;
+
+		logger.info("Server write lock disabled");
 	}
 
 	public void moveData() {
@@ -483,10 +493,10 @@ public class KVServer implements IKVServer, Runnable {
 		try {
 			serverSocket = new ServerSocket(port);
 			logger.info("Server listening on port: " 
-					+ serverSocket.getLocalPort());    
-			logger.info("Server cache strategy type is " 
-					+ cacheStrategy + " with size "
-					+ cacheSize);    
+					+ serverSocket.getLocalPort());
+
+			connectECS();
+
 			return true;
 		} catch (IOException e) {
 			logger.error("Error! Cannot open server socket:");
@@ -497,24 +507,49 @@ public class KVServer implements IKVServer, Runnable {
 		}
 	}
 
+	public void connectECS() {
+		try {
+			logger.info("Waiting for ECS connection on port: " 
+					+ serverSocket.getLocalPort());
+
+			Socket ecs = serverSocket.accept();                
+			ECSConnection connection = 
+					new ECSConnection(this, ecs);
+			new Thread(connection).start();
+	               
+			logger.info("Connected to ECS coordinator: " 
+					+ ecs.getInetAddress().getHostName() 
+					+  " on port " + ecs.getPort());
+
+		} catch (IOException e) {
+			logger.error("Error! Cannot open server socket:");
+			if(e instanceof BindException){
+				logger.error("Port " + port + " is already bound!");
+			}
+		
+		}
+	}
+
 	@Override
 	public void run(){
 		running = initializeServer();
 
 		if(serverSocket != null) {
 			while(this.running){
-				try {
-					Socket client = serverSocket.accept();                
-					ClientConnection connection = 
-							new ClientConnection(this, client);
-					new Thread(connection).start();
-	                
-					logger.info("Connected to " 
-							+ client.getInetAddress().getHostName() 
-							+  " on port " + client.getPort());
-				} catch (IOException e) {
-					logger.error("Error! " +
-							"Unable to establish connection. \n", e);
+				if (activated) {
+					try {
+						Socket client = serverSocket.accept();                
+						ClientConnection connection = 
+								new ClientConnection(this, client);
+						new Thread(connection).start();
+			            
+						logger.info("Connected to client " 
+								+ client.getInetAddress().getHostName() 
+								+  " on port " + client.getPort());
+					} catch (IOException e) {
+						logger.error("Error! " +
+								"Unable to establish connection. \n", e);
+					}
 				}
 			}
 		}
