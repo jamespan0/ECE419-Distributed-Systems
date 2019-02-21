@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import ecs.IECSNode;
 
 
-import ecs.IECSNode;
 
 import logger.LogSetup;
 
@@ -84,7 +83,7 @@ public class KVServer implements IKVServer, Runnable {
     private int m2_cachesize;
     private StringBuffer stringBuffer;  //hash of tuple encrypted
     // int to store ports, string stores map
-    //private TreeMap <int, String[]> metadata = new TreeMap<int, String[]>();
+    private TreeMap <Integer, IECSNode> metadata = new TreeMap<Integer, IECSNode>();
 
 	private boolean running = false;
 	public boolean activated = false;
@@ -150,10 +149,12 @@ public class KVServer implements IKVServer, Runnable {
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(String metadata, int cacheSize, String strategy) {
+	public void initKVServer(IECSNode meta_data, int cacheSize, String strategy) {
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
 //        serverStatus = serverTypes.SERVER_STOPPED;
+
+        //function to add current storage servers to TreeMap metadata
         activated = false ;
         writeLock = false ;
 
@@ -208,14 +209,31 @@ public class KVServer implements IKVServer, Runnable {
 		logger.info("Server write lock disabled");
 	}
 
-	public void moveData() {
+	public void moveData(String[] range, String server) {
 
-    // move data 
+    //check if range array is proper
+    if (range.length != 2) {
+        //range of array not proper, return fail to ECS
+        return;
+    }
+    // movehash gives integer in metadata for range of hashes selected for this server
+    Integer moveHash; /* = ECSHASH(server);*/
+
+    if (metadata.get(moveHash) == null) {
+        //Server not allocated, return fail to ECS
+        return;
+    } else {
+        
+
+    }
 
 
 	}
 
-	public void update() {
+	public void update(IECSNode meta_data) {
+        //need function to update map
+        //use IECSNODE meta_data to update map
+        
 
 
 	}
