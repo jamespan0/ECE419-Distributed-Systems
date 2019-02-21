@@ -14,7 +14,7 @@ import shared.messages.TextMessage;
  * The class also implements the echo functionality. Thus whenever a message 
  * is received it is going to be echoed back to the client.
  */
-public class ClientConnection implements Runnable {
+public class ECSConnection implements Runnable {
 
 	KVServer server;
 
@@ -24,7 +24,7 @@ public class ClientConnection implements Runnable {
 	private static final int BUFFER_SIZE = 1024;
 	private static final int DROP_SIZE = 128 * BUFFER_SIZE;
 	
-	private Socket clientSocket;
+	private Socket ecsSocket;
 	private InputStream input;
 	private OutputStream output;
 	
@@ -32,9 +32,9 @@ public class ClientConnection implements Runnable {
 	 * Constructs a new ClientConnection object for a given TCP socket.
 	 * @param clientSocket the Socket object for the client connection.
 	 */
-	public ClientConnection(KVServer server, Socket clientSocket) {
+	public ECSConnection(KVServer server, Socket ecsSocket) {
 		this.server = server;
-		this.clientSocket = clientSocket;
+		this.ecsSocket = ecsSocket;
 		this.isOpen = true;
 	}
 
@@ -42,56 +42,109 @@ public class ClientConnection implements Runnable {
 		String[] stringArray = message.getMsg().split("\\s+");
 
 		switch (stringArray[0]) {
-			case ("put"):	
+			case ("init"):
 				try {
-					if(server.activated) {
-						logger.info("PUT_KV \t<" 
-								+ clientSocket.getInetAddress().getHostAddress() + ":" 
-								+ clientSocket.getPort() + ">: 'PUT<" 
-								+ stringArray[1] + "," + stringArray[2] +">'");
-						if (server.writeLock) {
-							sendMessage(new TextMessage("SERVER_WRITE_LOCK"));
-						} else {
-							String result;
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + " " + stringArray[1] + " " + stringArray[2] + "...'");
 
-							synchronized(server) {
-								result = server.putKV(stringArray[1], stringArray[2]);
-							}
+					String[] tempArray = message.getMsg().split(" ", 4);
 
-							sendMessage(new TextMessage("PUT_" + result + " " + stringArray[1] + " "+ stringArray[2]));
-						}
-					} else {
-						sendMessage(new TextMessage("SERVER_STOPPED"));
-					}
-
+					server.initKVServer(tempArray[3], Integer.parseInt(tempArray[1]), tempArray[2]);
+					
+					sendMessage(new TextMessage("init_success"));
+					
 				} catch (Exception e) {
-					logger.error("Error: PUT command unsuccessful!", e);
+
+					logger.error("Error: ECS command unsuccessful!", e);
 				}
 
 				break;
 
-			case ("get"):
+			case ("start"):
 				try {
-					if(server.activated) {
-						logger.info("GET_KV \t<" 
-								+ clientSocket.getInetAddress().getHostAddress() + ":" 
-								+ clientSocket.getPort() + ">: 'GET<" 
-								+ stringArray[1] +">'");
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + "'");
 
-						String value;
-
-
-						synchronized(server) {
-							value = server.getKV(stringArray[1]);
-						}
-						
-						sendMessage(new TextMessage("GET_SUCCESS " + stringArray[1] + " "+ value));
-					} else {
-						sendMessage(new TextMessage("SERVER_STOPPED"));
-					}
+					server.start();
+					
+					sendMessage(new TextMessage("start_success"));
 					
 				} catch (Exception e) {
-					logger.error("Error: GET command unsuccessful!", e);
+
+					logger.error("Error: ECS command unsuccessful!", e);
+				}
+
+				break;
+
+			case ("stop"):
+				try {
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + "'");
+
+					server.stop();
+					
+					sendMessage(new TextMessage("stop_success"));
+				} catch (Exception e) {
+
+					logger.error("Error: ECS command unsuccessful!", e);
+				}
+
+				break;
+
+			case ("lock"):
+				try {
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + "'");
+
+					server.lockWrite();
+					
+					sendMessage(new TextMessage("lock_success"));
+				} catch (Exception e) {
+
+					logger.error("Error: ECS command unsuccessful!", e);
+				}
+
+				break;
+
+			case ("unlock"):
+				try {
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + "'");
+
+					server.unLockWrite();
+					
+					sendMessage(new TextMessage("unlock_success"));
+				} catch (Exception e) {
+
+					logger.error("Error: ECS command unsuccessful!", e);
+				}
+
+				break;
+			
+
+			case ("shutdown"):
+				try {
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + "'");
+
+					server.unLockWrite();
+					
+					sendMessage(new TextMessage("shutdown_success"));
+				} catch (Exception e) {
+
+					logger.error("Error: ECS command unsuccessful!", e);
 				}
 
 				break;
@@ -108,11 +161,11 @@ public class ClientConnection implements Runnable {
 	 */
 	public void run() {
 		try {
-			output = clientSocket.getOutputStream();
-			input = clientSocket.getInputStream();
+			output = ecsSocket.getOutputStream();
+			input = ecsSocket.getInputStream();
 		
 			sendMessage(new TextMessage(
-					"Connection to KV server established: " 
+					"KV server started on: " 
 					+ server.getHostname() + ":"
 					+ server.getPort()));
 			
@@ -146,8 +199,8 @@ public class ClientConnection implements Runnable {
 		output.write(msgBytes, 0, msgBytes.length);
 		output.flush();
 		logger.info("SEND \t<" 
-				+ clientSocket.getInetAddress().getHostAddress() + ":" 
-				+ clientSocket.getPort() + ">: '" 
+				+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+				+ ecsSocket.getPort() + ">: '" 
 				+ msg.getMsg() +"'");
         }
 	
@@ -213,8 +266,8 @@ public class ClientConnection implements Runnable {
 		/* build final String */
 		TextMessage msg = new TextMessage(msgBytes);
 		logger.info("RECEIVE \t<" 
-				+ clientSocket.getInetAddress().getHostAddress() + ":" 
-				+ clientSocket.getPort() + ">: '" 
+				+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+				+ ecsSocket.getPort() + ">: '" 
 				+ msg.getMsg().trim() + "'");
 
 		return msg;
@@ -223,10 +276,10 @@ public class ClientConnection implements Runnable {
         private void closeConnection() {
             isOpen = false;
             try {
-                if (clientSocket != null) {
+                if (ecsSocket != null) {
                     input.close();
                     output.close();
-                    clientSocket.close();
+                    ecsSocket.close();
                 }
             } catch (IOException ioe) {
                 logger.error("Error! Unable to tear down connection!", ioe);

@@ -112,6 +112,94 @@ public class KVClient implements IKVClient, ClientSocketListener {
                     }
                     break;
 
+
+				/************************** TESTING ***************************/
+                case "init":
+                        if(client != null && client.isRunning()){
+                            
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
+                            }
+                            sendMessage(msg.toString());
+
+                        } else {
+                            printError("Not connected!");
+                        }
+                    break;
+                case "start":
+                        if(client != null && client.isRunning()){
+                            
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
+                            }
+                            sendMessage(msg.toString());
+
+                        } else {
+                            printError("Not connected!");
+                        }
+                    break;
+
+                case "stop":
+                        if(client != null && client.isRunning()){
+                            
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
+                            }
+                            sendMessage(msg.toString());
+
+                        } else {
+                            printError("Not connected!");
+                        }
+                    break;
+
+                case "lock":
+                        if(client != null && client.isRunning()){
+                            
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
+                            }
+                            sendMessage(msg.toString());
+
+                        } else {
+                            printError("Not connected!");
+                        }
+                    break;
+
+                case "unlock":
+                        if(client != null && client.isRunning()){
+                            
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
+                            }
+                            sendMessage(msg.toString());
+
+                        } else {
+                            printError("Not connected!");
+                        }
+                    break;
+
+				/************************** TESTING ***************************/
+
                 case "get":
                     if(tokens.length == 2) {
                         if(client != null && client.isRunning()){

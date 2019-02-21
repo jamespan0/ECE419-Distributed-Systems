@@ -48,7 +48,6 @@ public class KVServer implements IKVServer, Runnable {
 	// private variables 
 	private static Logger logger = Logger.getRootLogger();
 	private ServerSocket serverSocket;
-
 	private int port;
 	private int cacheSize;
 	private CacheStrategy cacheStrategy;
@@ -88,7 +87,7 @@ public class KVServer implements IKVServer, Runnable {
     private TreeMap <Integer, String[]> metadata = new TreeMap<Integer, String[]>();
 
 	private boolean running = false;
-	public boolean activated = true;
+	public boolean activated = false;
 	public boolean writeLock = false;
 //    private serverTypes serverStatus;
     private String servername;
@@ -145,24 +144,18 @@ public class KVServer implements IKVServer, Runnable {
         else {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
         }
-
-
-
-
-        //run initKVServer at end
-
-
-        initKVServer(port,cacheSize,strategy);
         
 	}
 
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(int port, int cacheSize, String strategy) {
+	public void initKVServer(IECSNode meta_data, int cacheSize, String strategy) {
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
 //        serverStatus = serverTypes.SERVER_STOPPED;
+
+        //function to add current storage servers to TreeMap metadata
         activated = false ;
         writeLock = false ;
 
@@ -188,10 +181,16 @@ public class KVServer implements IKVServer, Runnable {
 
 	public void start() {
 		activated = true;
+
+		logger.info("Server activated on port: " 
+					+ serverSocket.getLocalPort());
 	}
 
 	public void stop() {
 		activated = false;
+
+		logger.info("Server deactivated on port: " 
+					+ serverSocket.getLocalPort());
 	}
 
 	public void shutDown() {
@@ -201,20 +200,39 @@ public class KVServer implements IKVServer, Runnable {
 
 	public void lockWrite() {
 		writeLock = true;
+
+		logger.info("Server write lock enabled");
 	}
 
 	public void unLockWrite() {
 		writeLock = false;
+
+		logger.info("Server write lock disabled");
 	}
 
-	public void moveData() {
+	public void moveData(String[] range, String server) {
 
-    // move data 
+    //check if range array is proper
+    if (range.length != 2) {
+        //range of array not proper, return fail to ECS
+        return;
+    }
+    // movehash gives integer in metadata for range of hashes selected for this server
+    Integer moveHash; /* = ECSHASH(server);*/
+
+    if (metadata.get(moveHash) == null) {
+        //Server not allocated, return fail to ECS
+        return;
+    } else {
+        
+
+    }
 
 
 	}
 
-	public void update() {
+	public void update(IECSNode meta_data) {
+        //need function to update map
 
 
 	}
@@ -552,10 +570,10 @@ public class KVServer implements IKVServer, Runnable {
 		try {
 			serverSocket = new ServerSocket(port);
 			logger.info("Server listening on port: " 
-					+ serverSocket.getLocalPort());    
-			logger.info("Server cache strategy type is " 
-					+ cacheStrategy + " with size "
-					+ cacheSize);    
+					+ serverSocket.getLocalPort());
+
+			connectECS();
+
 			return true;
 		} catch (IOException e) {
 			logger.error("Error! Cannot open server socket:");
@@ -563,6 +581,29 @@ public class KVServer implements IKVServer, Runnable {
 				logger.error("Port " + port + " is already bound!");
 			}
 			return false;
+		}
+	}
+
+	public void connectECS() {
+		try {
+			logger.info("Waiting for ECS connection on port: " 
+					+ serverSocket.getLocalPort());
+
+			Socket ecs = serverSocket.accept();                
+			ECSConnection connection = 
+					new ECSConnection(this, ecs);
+			new Thread(connection).start();
+	               
+			logger.info("Connected to ECS coordinator: " 
+					+ ecs.getInetAddress().getHostName() 
+					+  " on port " + ecs.getPort());
+
+		} catch (IOException e) {
+			logger.error("Error! Cannot open server socket:");
+			if(e instanceof BindException){
+				logger.error("Port " + port + " is already bound!");
+			}
+		
 		}
 	}
 
@@ -577,8 +618,8 @@ public class KVServer implements IKVServer, Runnable {
 					ClientConnection connection = 
 							new ClientConnection(this, client);
 					new Thread(connection).start();
-	                
-					logger.info("Connected to " 
+			           
+					logger.info("Connected to client " 
 							+ client.getInetAddress().getHostName() 
 							+  " on port " + client.getPort());
 				} catch (IOException e) {
