@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import ecs.IECSNode;
 
 
-import ecs.IECSNode;
 
 import logger.LogSetup;
 
@@ -84,7 +83,7 @@ public class KVServer implements IKVServer, Runnable {
     private int m2_cachesize;
     private StringBuffer stringBuffer;  //hash of tuple encrypted
     // int to store ports, string stores map
-    private TreeMap <Integer, String[]> metadata = new TreeMap<Integer, String[]>();
+    private TreeMap <Integer, IECSNode> metadata = new TreeMap<Integer, IECSNode>();
 
 	private boolean running = false;
 	public boolean activated = false;
@@ -233,6 +232,8 @@ public class KVServer implements IKVServer, Runnable {
 
 	public void update(IECSNode meta_data) {
         //need function to update map
+        //use IECSNODE meta_data to update map
+        
 
 
 	}
