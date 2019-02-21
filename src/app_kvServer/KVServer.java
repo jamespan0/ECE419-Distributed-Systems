@@ -48,13 +48,6 @@ public class KVServer implements IKVServer, Runnable {
 	// private variables 
 	private static Logger logger = Logger.getRootLogger();
 	private ServerSocket serverSocket;
-
-
-	private boolean running = false;
-
-	public boolean activated = false;
-	public boolean writeLock = false;
-
 	private int port;
 	private int cacheSize;
 	private CacheStrategy cacheStrategy;
@@ -91,10 +84,10 @@ public class KVServer implements IKVServer, Runnable {
     private int m2_cachesize;
     private StringBuffer stringBuffer;  //hash of tuple encrypted
     // int to store ports, string stores map
-    private TreeMap <int, String[]> metadata = new TreeMap<int, String[]>();
+    //private TreeMap <int, String[]> metadata = new TreeMap<int, String[]>();
 
 	private boolean running = false;
-	public boolean activated = true;
+	public boolean activated = false;
 	public boolean writeLock = false;
 //    private serverTypes serverStatus;
     private String servername;
@@ -151,20 +144,9 @@ public class KVServer implements IKVServer, Runnable {
         else {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
         }
-
-
-
-
-        //run initKVServer at end
-
-
-        initKVServer(port,cacheSize,strategy);
         
 	}
 
-<<<<<<< HEAD
-	public void initKVServer(String metadata, int cacheSize, String strategy) {
-=======
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
@@ -191,7 +173,6 @@ public class KVServer implements IKVServer, Runnable {
 
         decrypt(stringBuffer);
 */
->>>>>>> 4fc2ee275e7f05205a8234933fb0c5e0f2da415c
 
 	}
 
@@ -615,20 +596,18 @@ public class KVServer implements IKVServer, Runnable {
 
 		if(serverSocket != null) {
 			while(this.running){
-				if (activated) {
-					try {
-						Socket client = serverSocket.accept();                
-						ClientConnection connection = 
-								new ClientConnection(this, client);
-						new Thread(connection).start();
-			            
-						logger.info("Connected to client " 
-								+ client.getInetAddress().getHostName() 
-								+  " on port " + client.getPort());
-					} catch (IOException e) {
-						logger.error("Error! " +
-								"Unable to establish connection. \n", e);
-					}
+				try {
+					Socket client = serverSocket.accept();                
+					ClientConnection connection = 
+							new ClientConnection(this, client);
+					new Thread(connection).start();
+			           
+					logger.info("Connected to client " 
+							+ client.getInetAddress().getHostName() 
+							+  " on port " + client.getPort());
+				} catch (IOException e) {
+					logger.error("Error! " +
+							"Unable to establish connection. \n", e);
 				}
 			}
 		}
