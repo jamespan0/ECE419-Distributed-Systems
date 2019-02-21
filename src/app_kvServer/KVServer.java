@@ -226,7 +226,7 @@ public class KVServer implements IKVServer, Runnable {
         Integer higher = Integer.valueOf(range[1]);
         ArrayList<String> removal = new ArrayList<String>();
         // movehash gives integer in metadata for range of hashes selected for this server
-        Integer moveHash; /* = ECSHASH(server);*/
+        Integer moveHash = hashing(server);
 
         if (metadata.get(moveHash) == null) {
             //Server not allocated, return fail to ECS
