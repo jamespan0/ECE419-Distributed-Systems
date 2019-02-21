@@ -217,7 +217,7 @@ public class KVServer implements IKVServer, Runnable {
         return;
     }
     // movehash gives integer in metadata for range of hashes selected for this server
-    Integer moveHash; /* = ECSHASH(server);*/
+    Integer moveHash = 0; /* = ECSHASH(server);*/
 
     if (metadata.get(moveHash) == null) {
         //Server not allocated, return fail to ECS
