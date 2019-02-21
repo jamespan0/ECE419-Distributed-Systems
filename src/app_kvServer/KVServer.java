@@ -238,8 +238,8 @@ public class KVServer implements IKVServer, Runnable {
             if (getCacheStrategy() == IKVServer.CacheStrategy.FIFO) {
                 // cache_FIFO
                 for (String key : cache_FIFO.keySet()) {
-                    String newKey = key + ":" + cache_FIFO.get(key);
-                    String moveData = key + " " + cache_FIFO.get(key);
+                    String newKey = key + ":" + cache_FIFO.get(key).nodeHashRange;
+                    String moveData = key + " " + cache_FIFO.get(key).nodeHashRange;
                     Integer hash = hashing(newKey);
                     if (hash.intValue() > lower.intValue() && hash.intValue() < higher.intValue()) {
                         removal.add(moveData); 
@@ -251,8 +251,8 @@ public class KVServer implements IKVServer, Runnable {
             } else if (getCacheStrategy() == IKVServer.CacheStrategy.LRU) {
                 // cache_LRU
                 for (String key : cache_FIFO.keySet()) {
-                    String newKey = key + ":" + cache_FIFO.get(key);
-                    String moveData = key + " " + cache_FIFO.get(key);
+                    String newKey = key + ":" + cache_FIFO.get(key).nodeHashRange;
+                    String moveData = key + " " + cache_FIFO.get(key).nodeHashRange;
                     Integer hash = hashing(newKey);
                     if (hash.intValue() > lower.intValue() && hash.intValue() < higher.intValue()) {
                         removal.add(moveData); 
