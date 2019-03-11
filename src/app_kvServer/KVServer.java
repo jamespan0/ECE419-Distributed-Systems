@@ -30,8 +30,6 @@ import org.apache.log4j.*;
 import client.KVCommInterface;
 import client.KVStore;
 
-import shared.messages.TextMessage;
-
 public class KVServer implements IKVServer, Runnable {
 	/**
 	 * Start KV Server at given port
@@ -149,7 +147,7 @@ public class KVServer implements IKVServer, Runnable {
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(IECSNode meta_data, int cacheSize, String strategy) {
+	public void initKVServer(String meta_data, int cacheSize, String strategy) {
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
 //        serverStatus = serverTypes.SERVER_STOPPED;

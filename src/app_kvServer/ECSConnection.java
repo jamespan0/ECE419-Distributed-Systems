@@ -5,7 +5,7 @@ import java.net.Socket;
 
 import org.apache.log4j.*;
 
-import shared.messages.TextMessage;
+import shared.messages.KVAdminMessage;
 
 /**
  * Represents a connection end point for a particular client that is 
@@ -38,11 +38,11 @@ public class ECSConnection implements Runnable {
 		this.isOpen = true;
 	}
 
-	public void parseCommand(TextMessage message) {
+	public void parseCommand(KVAdminMessage message) {
 		String[] stringArray = message.getMsg().split("\\s+");
 
 		switch (stringArray[0]) {
-			case ("init"):
+			case ("INIT"):
 				try {
 					logger.info("ECS Message \t<" 
 							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
@@ -53,7 +53,7 @@ public class ECSConnection implements Runnable {
 
 					server.initKVServer(tempArray[3], Integer.parseInt(tempArray[1]), tempArray[2]);
 					
-					sendMessage(new TextMessage("init_success"));
+					sendMessage(new KVAdminMessage("INIT_SUCCESS"));
 					
 				} catch (Exception e) {
 
@@ -62,7 +62,7 @@ public class ECSConnection implements Runnable {
 
 				break;
 
-			case ("start"):
+			case ("START"):
 				try {
 					logger.info("ECS Message \t<" 
 							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
@@ -71,7 +71,7 @@ public class ECSConnection implements Runnable {
 
 					server.start();
 					
-					sendMessage(new TextMessage("start_success"));
+					sendMessage(new KVAdminMessage("start_success"));
 					
 				} catch (Exception e) {
 
@@ -80,7 +80,7 @@ public class ECSConnection implements Runnable {
 
 				break;
 
-			case ("stop"):
+			case ("STOP"):
 				try {
 					logger.info("ECS Message \t<" 
 							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
@@ -89,7 +89,7 @@ public class ECSConnection implements Runnable {
 
 					server.stop();
 					
-					sendMessage(new TextMessage("stop_success"));
+					sendMessage(new KVAdminMessage("stop_success"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -97,7 +97,7 @@ public class ECSConnection implements Runnable {
 
 				break;
 
-			case ("lock"):
+			case ("LOCK"):
 				try {
 					logger.info("ECS Message \t<" 
 							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
@@ -106,7 +106,7 @@ public class ECSConnection implements Runnable {
 
 					server.lockWrite();
 					
-					sendMessage(new TextMessage("lock_success"));
+					sendMessage(new KVAdminMessage("lock_success"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -114,7 +114,7 @@ public class ECSConnection implements Runnable {
 
 				break;
 
-			case ("unlock"):
+			case ("UNLOCK"):
 				try {
 					logger.info("ECS Message \t<" 
 							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
@@ -123,7 +123,7 @@ public class ECSConnection implements Runnable {
 
 					server.unLockWrite();
 					
-					sendMessage(new TextMessage("unlock_success"));
+					sendMessage(new KVAdminMessage("unlock_success"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -132,7 +132,7 @@ public class ECSConnection implements Runnable {
 				break;
 			
 
-			case ("shutdown"):
+			case ("SHUT_DOWN"):
 				try {
 					logger.info("ECS Message \t<" 
 							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
@@ -141,7 +141,23 @@ public class ECSConnection implements Runnable {
 
 					server.unLockWrite();
 					
-					sendMessage(new TextMessage("shutdown_success"));
+					sendMessage(new KVAdminMessage("shutdown_success"));
+				} catch (Exception e) {
+
+					logger.error("Error: ECS command unsuccessful!", e);
+				}
+
+				break;
+			
+
+			case ("UPDATE"):
+				try {
+					logger.info("ECS Message \t<" 
+							+ ecsSocket.getInetAddress().getHostAddress() + ":" 
+							+ ecsSocket.getPort() + ">: 'ECS: " 
+							+ stringArray[0] + "'");
+					
+					sendMessage(new KVAdminMessage("update_success"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -164,14 +180,14 @@ public class ECSConnection implements Runnable {
 			output = ecsSocket.getOutputStream();
 			input = ecsSocket.getInputStream();
 		
-			sendMessage(new TextMessage(
+			sendMessage(new KVAdminMessage(
 					"KV server started on: " 
 					+ server.getHostname() + ":"
 					+ server.getPort()));
 			
 			while(isOpen) {
 				try {
-					TextMessage latestMsg = receiveMessage();
+					KVAdminMessage latestMsg = receiveMessage();
 					parseCommand(latestMsg);					
 				/* connection either terminated by the client or lost due to 
 				 * network problems*/	
@@ -190,11 +206,11 @@ public class ECSConnection implements Runnable {
 	}
 	
 	/**
-	 * Method sends a TextMessage using this socket.
+	 * Method sends a KVAdminMessage using this socket.
 	 * @param msg the message that is to be sent.
 	 * @throws IOException some I/O error regarding the output stream 
 	 */
-	public void sendMessage(TextMessage msg) throws IOException {
+	public void sendMessage(KVAdminMessage msg) throws IOException {
 		byte[] msgBytes = msg.getMsgBytes();
 		output.write(msgBytes, 0, msgBytes.length);
 		output.flush();
@@ -205,7 +221,7 @@ public class ECSConnection implements Runnable {
         }
 	
 	
-	private TextMessage receiveMessage() throws IOException {
+	private KVAdminMessage receiveMessage() throws IOException {
 		
 		int index = 0;
 		byte[] msgBytes = null, tmp = null;
@@ -264,7 +280,7 @@ public class ECSConnection implements Runnable {
 		msgBytes = tmp;
 		
 		/* build final String */
-		TextMessage msg = new TextMessage(msgBytes);
+		KVAdminMessage msg = new KVAdminMessage(msgBytes);
 		logger.info("RECEIVE \t<" 
 				+ ecsSocket.getInetAddress().getHostAddress() + ":" 
 				+ ecsSocket.getPort() + ">: '" 
