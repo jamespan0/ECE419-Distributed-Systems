@@ -5,25 +5,63 @@ import java.util.Collection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.IOException;
 
 import ecs.ECSNode;
 import ecs.IECSNode;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 
 import client.KVStore;
 import shared.messages.ClientSocketListener;
+import shared.messages.KVAdminMessage;
 import shared.messages.TextMessage;
+
+import logger.LogSetup;
+import org.apache.log4j.*;
+
+import org.apache.zookeeper.*;
+import org.apache.zookeeper.data.*;
 
 public class ECSClient implements IECSClient, ClientSocketListener {
 
+	private static Logger logger = Logger.getRootLogger();
+
     private static final int HASH_LOWER_BOUND = 0;
     private static final int HASH_UPPER_BOUND = Integer.parseInt("FFFF", 16);
+
+	private static final String ZK_CONNECT = "127.0.0.1:2181";
+	private static final int ZK_TIMEOUT = 2000;
+
+	private ZooKeeper zk;
+	private CountDownLatch connectedSignal;
     
     private Map<String, IECSNode> nodes;
-    
+
+	public ECSClient() {
+			try {
+				connectedSignal = new CountDownLatch(1);
+
+				zk = new ZooKeeper(ZK_CONNECT, ZK_TIMEOUT, new Watcher() {
+					@Override
+					public void process(WatchedEvent event) {
+						if (event.getState() == Watcher.Event.KeeperState.SyncConnected) {
+							connectedSignal.countDown();
+						}
+					}
+				});
+
+				connectedSignal.await();
+
+				logger.info("New ZooKeeper connection at: " + ZK_CONNECT);
+			} catch (IOException | InterruptedException e) {
+				logger.error(e);
+			}
+	}
+
+
     @Override
     public boolean start() {
         if (nodes.isEmpty()) {
@@ -130,29 +168,42 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-        String[] hash_range = hash_insert_loc();
-        
-        // update new hash range (lower)
-        String[] hash_loc = hash_range;
-        hash_loc[1] = Integer.toHexString((int) hexstr_to_int((hash_range[1]+ hash_range[0]))/2);
-        
-        // setup nodes called inside
-        IECSNode _node = addNodeInternal(cacheStrategy, cacheSize, hash_loc);
-        try {
-            awaitNodes(1, 100);
-        } catch (Exception e) {
-            System.out.println("ECSClient addNode Error" + e.getMessage());
-            return null;
-        }
-        nodes.put(hash_loc[1], _node);
-        
-        // update old hash range (higher)
-        String hash_remain = Integer.toHexString(hexstr_to_int(hash_loc[0]) + 1);
-        String[] hash_range_old = hash_range;
-        hash_range_old[0] = hash_remain;
-        update_hash_range(hash_range[1], hash_range_old);
-        
-        return _node;
+		try {
+	
+		    String[] hash_range = hash_insert_loc();
+		    
+		    // update new hash range (lower)
+		    String[] hash_loc = hash_range;
+		    hash_loc[1] = Integer.toHexString((int) hexstr_to_int((hash_range[1]+ hash_range[0]))/2);
+		    
+		    // setup nodes called inside
+		    IECSNode _node = addNodeInternal(cacheStrategy, cacheSize, hash_loc);
+		    try {
+		        awaitNodes(1, 100);
+		    } catch (Exception e) {
+		        System.out.println("ECSClient addNode Error" + e.getMessage());
+		        return null;
+		    }
+		    nodes.put(hash_loc[1], _node);
+		    
+		    // update old hash range (higher)
+		    String hash_remain = Integer.toHexString(hexstr_to_int(hash_loc[0]) + 1);
+		    String[] hash_range_old = hash_range;
+		    hash_range_old[0] = hash_remain;
+		    update_hash_range(hash_range[1], hash_range_old);
+
+			String path =  "/" + _node.getNodeName();
+
+			zk.create(path, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+			logger.info("New node created at /" + path);
+		    
+		    return _node;
+		} catch (KeeperException | InterruptedException e) {
+			logger.error("Error adding new node!");
+
+			return null;
+		}
     }
 
     @Override
@@ -222,6 +273,25 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     private static final String PROMPT = "ECSClient> ";
     private BufferedReader stdin;
     
+
+    public void handleNewAdminMessage(KVAdminMessage msg) {
+		if (connected) {
+                    if(!stop) {
+                        System.out.println("Server reply: " + msg.getMsg());
+                    }
+                    System.out.print(PROMPT);
+                } else {
+
+                    if (msg.getMsg().indexOf("Connection to storage server established:") != 0) {
+                            connected = true;
+                    }
+
+                    System.out.println(msg.getMsg());
+                    System.out.print(PROMPT);
+		}
+    }
+    
+
     public void handleNewMessage(TextMessage msg) {
 		if (connected) {
                     if(!stop) {
@@ -272,7 +342,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
         try {
             connection.connect();
         } catch (Exception e) {
-            printError("Conenction Failed!");
+            printError("Connection Failed!");
             return;
         }
         
@@ -282,7 +352,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
         if(connection.isRunning()) {
                             
             try {
-                    connection.sendMessage(new TextMessage(message));
+                    connection.sendAdminMessage(new KVAdminMessage(message));
             } catch (IOException e) {
                     printError("Unable to send message!");
                     connection.disconnect();
@@ -389,6 +459,27 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     }
     
     private void printHelp() {
+
+	try {
+		Stat test = zk.exists("/testing", true);
+
+		if(test == null){
+			zk.create("/testing", "abcdefg".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+		}
+				//zk.create("/testing", "abcdefg".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				System.out.println("hello");
+
+				System.out.println("asdlapwldwpaldpwld: " + new String(zk.getData("/testing", new Watcher(){
+					@Override
+					public void process(WatchedEvent event) {
+
+					}
+
+				}, new Stat())));
+	} catch (KeeperException | InterruptedException e) {
+
+	}
+
                 StringBuilder sb = new StringBuilder();
                 sb.append("HELP (Usage):\n");
                 sb.append("::::::::::::::::::::::::::::::::");
@@ -409,8 +500,15 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     }
     
     public static void main(String[] args) {
-                ECSClient app = new ECSClient();
-                app.nodes = new HashMap<String, IECSNode>();
-                app.run();
+    	try {
+			new LogSetup("logs/ecs.log", Level.INFO);
+            ECSClient app = new ECSClient();
+            app.nodes = new HashMap<String, IECSNode>();
+            app.run();
+		} catch (IOException e) {
+			System.out.println("Error! Unable to initialize logger!");
+			e.printStackTrace();
+			System.exit(1);
+		}
     }
 }

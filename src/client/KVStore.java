@@ -11,6 +11,7 @@ import java.util.Set;
 import org.apache.log4j.Logger;
 
 import shared.messages.KVMessage;
+import shared.messages.KVAdminMessage;
 import shared.messages.TextMessage;
 import shared.messages.ClientSocketListener;
 import shared.messages.ClientSocketListener.SocketStatus;
@@ -181,6 +182,12 @@ public class KVStore extends Thread implements KVCommInterface {
                 logger.info("Send message:\t '" + msg.getMsg() + "'");
         }
 
+        public void sendAdminMessage(KVAdminMessage msg) throws IOException {
+                byte[] msgBytes = msg.getMsgBytes();
+                output.write(msgBytes, 0, msgBytes.length);
+                output.flush();
+                logger.info("Send message:\t '" + msg.getMsg() + "'");
+        }
 
         private TextMessage receiveMessage() throws IOException {
 
