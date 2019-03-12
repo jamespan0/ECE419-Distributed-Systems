@@ -32,15 +32,16 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     private static final int HASH_LOWER_BOUND = 0;
     private static final int HASH_UPPER_BOUND = Integer.parseInt("FFFF", 16);
 
-	private static final String ZK_CONNECT = "127.0.0.1:2181";
-	private static final int ZK_TIMEOUT = 2000;
+	//private static final String ZK_CONNECT = "127.0.0.1:2181";
+	//private static final int ZK_TIMEOUT = 2000;
 
-	private ZooKeeper zk;
-	private CountDownLatch connectedSignal;
+	//private ZooKeeper zk;
+	//private CountDownLatch connectedSignal;
     
     private Map<String, IECSNode> nodes;
 
 	public ECSClient() {
+            /*
 			try {
 				connectedSignal = new CountDownLatch(1);
 
@@ -59,6 +60,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 			} catch (IOException | InterruptedException e) {
 				logger.error(e);
 			}
+            */
 	}
 
 
@@ -168,7 +170,6 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-		try {
 	
 		    String[] hash_range = hash_insert_loc();
 		    
@@ -192,6 +193,9 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 		    hash_range_old[0] = hash_remain;
 		    update_hash_range(hash_range[1], hash_range_old);
 
+                    // ZK commented
+                    /*
+                try {
 			String path =  "/" + _node.getNodeName();
 
 			zk.create(path, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -204,6 +208,8 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 
 			return null;
 		}
+                    */
+                    return _node;
     }
 
     @Override
@@ -219,14 +225,21 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
         int port = 0;
         // to have hash as the name put "TEST_USE_HASH"
+        // Get from available nodes with ecs.config
         IECSNode _node = (IECSNode) new ECSNode("TEST_USE_HASH", "127.0.0.1", port, null);
         ArrayList<IECSNode> _nodes = new ArrayList<IECSNode>();
+        
+        // create zookeper node here
+        
         _nodes.add(_node);
         return _nodes;
     }
 
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
+        
+        // zookeeper stuff
+        
         return true;
     }
     
@@ -460,6 +473,8 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     private void printHelp() {
 
+        // ZK Commented
+        /*
 	try {
 		Stat test = zk.exists("/testing", true);
 
@@ -478,7 +493,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 				}, new Stat())));
 	} catch (KeeperException | InterruptedException e) {
 
-	}
+	}*/
 
                 StringBuilder sb = new StringBuilder();
                 sb.append("HELP (Usage):\n");
@@ -501,7 +516,11 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     public static void main(String[] args) {
     	try {
-			new LogSetup("logs/ecs.log", Level.INFO);
+            new LogSetup("logs/ecs.log", Level.INFO);
+            
+            // Get file from command line arg
+            
+            
             ECSClient app = new ECSClient();
             app.nodes = new HashMap<String, IECSNode>();
             app.run();
