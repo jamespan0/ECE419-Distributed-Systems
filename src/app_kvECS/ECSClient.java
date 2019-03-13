@@ -32,6 +32,8 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     private static final int HASH_LOWER_BOUND = 0;
     private static final int HASH_UPPER_BOUND = Integer.parseInt("FFFF", 16);
 
+	int activeServers;
+
 	//private static final String ZK_CONNECT = "127.0.0.1:2181";
 	//private static final int ZK_TIMEOUT = 2000;
 
@@ -41,6 +43,8 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     private Map<String, IECSNode> nodes;
 
 	public ECSClient() {
+			activeServers = 0;
+
             /*
 			try {
 				connectedSignal = new CountDownLatch(1);
@@ -57,6 +61,11 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 				connectedSignal.await();
 
 				logger.info("New ZooKeeper connection at: " + ZK_CONNECT);
+
+				zk.create("/activeNodes", "".getBytes, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+	
+				logger.info("Znode /activeNodes created");
+
 			} catch (IOException | InterruptedException e) {
 				logger.error(e);
 			}
@@ -71,7 +80,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
             return false;
         }
         for (IECSNode node : nodes.values()) {
-            sendMessage(node, "start");
+            sendMessage(node, "START");
         }
         return true;
     }
@@ -83,7 +92,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
             return false;
         }
         for (IECSNode node : nodes.values()) {
-            sendMessage(node, "stop");
+            sendMessage(node, "STOP");
         }
         return true;
     }
@@ -182,7 +191,9 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 		    // add new node with the range lower - mid
 		    IECSNode _node = addNodeInternal(cacheStrategy, cacheSize, hash_loc);
 		    try {
-		        awaitNodes(1, 100);
+		        if (awaitNodes(1, 3000)) {
+					activeServers++;
+				}
 		    } catch (Exception e) {
 		        System.out.println("ECSClient addNode Error" + e.getMessage());
 		        return null;
@@ -195,23 +206,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
                         hash_range[0] = Integer.toHexString(hexstr_to_int(hash_loc[1]) + 1);
                         update_hash_range(hash_range[1], hash_range);
                     }
-                    
-                    // ZK commented
-                    /*
-                try {
-			String path =  "/" + _node.getNodeName();
 
-			zk.create(path, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-			logger.info("New node created at /" + path);
-		    
-		    return _node;
-		} catch (KeeperException | InterruptedException e) {
-			logger.error("Error adding new node!");
-
-			return null;
-		}
-                    */
                     return _node;
     }
 
@@ -233,6 +228,22 @@ public class ECSClient implements IECSClient, ClientSocketListener {
         ArrayList<IECSNode> _nodes = new ArrayList<IECSNode>();
         
         // create zookeper node here
+                    
+		// ZK commented
+		/*
+		try {
+			String path =  "/" + _node.getNodeName();
+			zk.create(path, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+			logger.info("New node created at /" + path);
+				
+			return _node;
+		} catch (KeeperException | InterruptedException e) {
+			logger.error("Error adding new node!");
+
+			return null;
+		}
+        */
         
         _nodes.add(_node);
         return _nodes;
@@ -241,13 +252,21 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
         
-        // zookeeper stuff
+        long currentTime = System.currentTimeMillis();
+
+		while (System.currentTimeMillis() - currentTime < timeout) {
+			/*List<String> activeNodes = zk.getChildren("/activeNodes", true);
+
+			if (activeNodes.size() == activeServers + count) {
+				return true;
+			}*/
+		}
         
-        return true;
+        return false;
     }
     
     private void shutdownNode(IECSNode node) {
-        sendMessage(node, "shutdown");
+        sendMessage(node, "SHUT_DOWN");
     }
 
     @Override
@@ -260,10 +279,20 @@ public class ECSClient implements IECSClient, ClientSocketListener {
             if (nodes.containsKey(_nodeNames[i])) {
                 IECSNode _node = nodes.remove(_nodeNames[i]);
                 shutdownNode(_node);
+
+				/*try {
+					String path = "/" + _nodeNames[i];
+
+					Stat st = zk.exists(path, false);
+					zk.delete(path, st.getVersion());
+				} catch (KeeperException | InterruptedException e) {
+					logger.error("Error! Znode deletion failed.");
+				}*/
             }
             else somenotdeleted = true;
             
         }
+
         return !somenotdeleted;
     }
     
@@ -475,29 +504,6 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     }
     
     private void printHelp() {
-
-        // ZK Commented
-        /*
-	try {
-		Stat test = zk.exists("/testing", true);
-
-		if(test == null){
-			zk.create("/testing", "abcdefg".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-		}
-				//zk.create("/testing", "abcdefg".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-				System.out.println("hello");
-
-				System.out.println("asdlapwldwpaldpwld: " + new String(zk.getData("/testing", new Watcher(){
-					@Override
-					public void process(WatchedEvent event) {
-
-					}
-
-				}, new Stat())));
-	} catch (KeeperException | InterruptedException e) {
-
-	}*/
-
                 StringBuilder sb = new StringBuilder();
                 sb.append("HELP (Usage):\n");
                 sb.append("::::::::::::::::::::::::::::::::");
