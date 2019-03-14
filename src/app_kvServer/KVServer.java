@@ -186,17 +186,19 @@ public class KVServer implements IKVServer, Runnable {
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(String[] meta_data, int port ,int cacheSize, String strategy) {
+	public void initKVServer(String meta_data, int port ,int cacheSize, String strategy) {
 
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
 //        serverStatus = serverTypes.SERVER_STOPPED;
-        String serverName = meta_data[0];
-        BigInteger serverHash = new BigInteger(meta_data[1]);
+        //String serverName = meta_data[0];
+
+        // assume meta_data is the string name of the server::port
+        BigInteger serverHash = new BigInteger(meta_data);
 
         // add hash and servername into the ring
         //metadata.lastKey() is the largest key in the hash ring available
-        this.metadata.put(serverHash,serverName);
+        this.metadata.put(serverHash,meta_data);
 
         // store results of meta_data in struct above
         KVServer newServer = new KVServer(port, cacheSize, strategy) {
@@ -278,23 +280,24 @@ public class KVServer implements IKVServer, Runnable {
 		logger.info("Server write lock disabled");
 	}
 
+    //range should ideally be in head
 	public void moveData(String[] range, String server) {
 
-    //check if range array is proper
-    if (range.length != 2) {
-        //range of array not proper, return fail to ECS
-        return;
-    }
-    // movehash gives integer in metadata for range of hashes selected for this server
-    Integer moveHash = 0; /* = ECSHASH(server);*/
+        //check if range array is proper
+        if (range.length != 2) {
+            //range of array not proper, return fail to ECS
+            return;
+        }
+        // movehash gives integer in metadata for range of hashes selected for this server
+        Integer moveHash = 0; /* = ECSHASH(server);*/
 
-    if (metadata.get(moveHash) == null) {
+        if (metadata.get(moveHash) == null) {
         //Server not allocated, return fail to ECS
         return;
-    } else {
+        } else {
         
 
-    }
+        }
 
 
 	}
