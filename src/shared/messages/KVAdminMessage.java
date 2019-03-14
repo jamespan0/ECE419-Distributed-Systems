@@ -53,22 +53,22 @@ public class KVAdminMessage implements Serializable {
             return null;
         }
 
-        public String getCacheSize() {
+        public int getCacheSize() {
             
             String[] tokens = getMsg().split("\\s+");
             
             if (tokens.length > 1) {
-            	return tokens[1];
+            	return Integer.parseInt(tokens[1]);
             }
             
-            return null;
+            return 0;
         }
 
         public String getCacheStrategy() {
             
             String[] tokens = getMsg().split("\\s+");
             
-            if (tokens.length > 1) {
+            if (tokens.length > 2) {
             	return tokens[2];
             }
             
@@ -77,9 +77,10 @@ public class KVAdminMessage implements Serializable {
 
         public String getMetadata() {
             
-            String[] tokens = getMsg().split(" ", 4);
+            String[] tokens = getMsg().split("\\s+");
             
-            if (tokens[0] == "INIT") {
+            if (tokens.length > 2) {
+            	tokens = getMsg().split(" ", 4);
 				return tokens[3];
             } else {
 				return tokens[1];

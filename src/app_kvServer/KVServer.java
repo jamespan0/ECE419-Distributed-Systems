@@ -721,6 +721,14 @@ public class KVServer implements IKVServer, Runnable, Watcher {
 				case "STOP":
 					stop();
 					break;
+				case ("INIT"):
+					//initKVServer(message.getMetadata(), message.getCacheSize(), message.getCacheStrategy());
+					break;
+				case ("UPDATE"):
+					//initKVServer(message.getMetadata(), message.getCacheSize(), message.getCacheStrategy());
+					break;
+				default:
+					break;		
 			}
 
 			zk.exists("/" + serverName + "/message", true);

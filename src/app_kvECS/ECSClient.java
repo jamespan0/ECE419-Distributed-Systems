@@ -138,7 +138,7 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 			try {
 				Stat st = zk.exists("/TEST_USE_HASH/message", true);
 
-				zk.setData("/TEST_USE_HASH/message", "STOP".getBytes(), st.getVersion());
+				zk.setData("/TEST_USE_HASH/message", "INIT 10 FIFO aodkwaokdowkdwoko".getBytes(), st.getVersion());
 			} catch (KeeperException | InterruptedException e) {
 
 			}
