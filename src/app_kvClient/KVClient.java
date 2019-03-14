@@ -114,7 +114,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
 
 
 				/************************** TESTING ***************************/
-                case "init":
+                case "INIT":
                         if(client != null && client.isRunning()){
                             
                             StringBuilder msg = new StringBuilder();
@@ -130,24 +130,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
                             printError("Not connected!");
                         }
                     break;
-                case "start":
-                        if(client != null && client.isRunning()){
-                            
-                            StringBuilder msg = new StringBuilder();
-                            for(int i = 0; i < tokens.length; i++) {
-                                msg.append(tokens[i]);
-                                if (i != tokens.length -1 ) {
-                                    msg.append(" ");
-                                }
-                            }
-                            sendMessage(msg.toString());
-
-                        } else {
-                            printError("Not connected!");
-                        }
-                    break;
-
-                case "stop":
+                case "START":
                         if(client != null && client.isRunning()){
                             
                             StringBuilder msg = new StringBuilder();
@@ -164,7 +147,7 @@ public class KVClient implements IKVClient, ClientSocketListener {
                         }
                     break;
 
-                case "lock":
+                case "STOP":
                         if(client != null && client.isRunning()){
                             
                             StringBuilder msg = new StringBuilder();
@@ -181,7 +164,24 @@ public class KVClient implements IKVClient, ClientSocketListener {
                         }
                     break;
 
-                case "unlock":
+                case "LOCK":
+                        if(client != null && client.isRunning()){
+                            
+                            StringBuilder msg = new StringBuilder();
+                            for(int i = 0; i < tokens.length; i++) {
+                                msg.append(tokens[i]);
+                                if (i != tokens.length -1 ) {
+                                    msg.append(" ");
+                                }
+                            }
+                            sendMessage(msg.toString());
+
+                        } else {
+                            printError("Not connected!");
+                        }
+                    break;
+
+                case "UNLOCK":
                         if(client != null && client.isRunning()){
                             
                             StringBuilder msg = new StringBuilder();

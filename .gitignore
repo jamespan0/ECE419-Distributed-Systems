@@ -10,6 +10,8 @@ logs/
 m2-client.jar
 m2-server.jar
 m2-ecs.jar
+key
+key.pub
 /nbproject/private/
 /build/
 /zookeeper-3.4.11

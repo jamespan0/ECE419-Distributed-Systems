@@ -5,24 +5,30 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+
 import java.math.BigInteger;
-import java.io.IOException;
+
 import java.util.HashMap;
 import java.util.TreeMap;
+import java.util.Map;
+import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.concurrent.locks.*;
+import java.util.concurrent.CountDownLatch;
+
+import java.io.IOException;
 import java.io.BufferedWriter;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.FileReader;
 import java.io.FileNotFoundException;
-import java.util.Map;
-import java.util.LinkedHashMap;
-import java.util.concurrent.locks.*;
+import java.nio.ByteBuffer;
+
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+
 import ecs.IECSNode;
-
-
 
 import logger.LogSetup;
 
@@ -34,7 +40,9 @@ import org.apache.zookeeper.data.*;
 import client.KVCommInterface;
 import client.KVStore;
 
-public class KVServer implements IKVServer, Runnable {
+import shared.messages.KVAdminMessage;
+
+public class KVServer implements IKVServer, Runnable, Watcher {
 	/**
 	 * Start KV Server at given port
 	 * @param port given port for storage server to operate - in echoServer gave range 49152 to 65535
@@ -93,7 +101,14 @@ public class KVServer implements IKVServer, Runnable {
 	public boolean activated = false;
 	public boolean writeLock = false;
 //    private serverTypes serverStatus;
-    private String servername;
+
+    private String serverName = "TEST_USE_HASH";
+
+	private static final String ZK_CONNECT = "127.0.0.1:2181";
+	private static final int ZK_TIMEOUT = 2000;
+
+	private ZooKeeper zk;
+	private CountDownLatch connectedSignal;
 
 
 /*
@@ -155,7 +170,7 @@ public class KVServer implements IKVServer, Runnable {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
         }
 
-            /*
+            
 			try {
 				connectedSignal = new CountDownLatch(1);
 
@@ -172,14 +187,25 @@ public class KVServer implements IKVServer, Runnable {
 
 				logger.info("New ZooKeeper connection at: " + ZK_CONNECT);
 
-				zk.create("/activeNodes/" + port, "".getBytes, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				zk.register(this);
+				
+				Stat st = zk.exists("/" + serverName, true);
+				
+				if (st == null) {
+					zk.create("/" + serverName, "".getBytes(),
+												ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				} else {
+					st = zk.exists("/" + serverName + "/message", false);
+					zk.setData("/" + serverName + "/message", "".getBytes(), st.getVersion());
+					st = zk.exists("/" + serverName + "/message", true);
+				}
 	
-				logger.info("Znode /activeNodes/" + port + " created");
+				logger.info("Znode /" + serverName + " initialized");
 
-			} catch (IOException | InterruptedException e) {
+			} catch (KeeperException | IOException | InterruptedException e) {
 				logger.error(e);
 			}
-            */
+            
         
 	}
 
@@ -250,17 +276,33 @@ public class KVServer implements IKVServer, Runnable {
 
 
 	public void start() {
-		activated = true;
+		try{
+			activated = true;
 
-		logger.info("Server activated on port: " 
-					+ serverSocket.getLocalPort());
+			Stat st = zk.exists("/ecsMessages", false);
+
+			zk.setData("/ecsMessages", (serverName + " Started").getBytes(), st.getVersion());
+
+			logger.info("Server activated on port: " 
+						+ serverSocket.getLocalPort());
+		} catch (KeeperException | InterruptedException e) {
+			logger.error(e);
+		}
 	}
 
 	public void stop() {
-		activated = false;
+		try{
+			activated = true;
 
-		logger.info("Server deactivated on port: " 
-					+ serverSocket.getLocalPort());
+			Stat st = zk.exists("/ecsMessages", false);
+
+			zk.setData("/ecsMessages", (serverName + " Stopped").getBytes(), st.getVersion());
+
+			logger.info("Server deactivated on port: " 
+						+ serverSocket.getLocalPort());
+		} catch (KeeperException | InterruptedException e) {
+			logger.error(e);
+		}
 	}
 
 	public void shutDown() {
@@ -645,8 +687,6 @@ public class KVServer implements IKVServer, Runnable {
 			logger.info("Server listening on port: " 
 					+ serverSocket.getLocalPort());
 
-			connectECS();
-
 			return true;
 		} catch (IOException e) {
 			logger.error("Error! Cannot open server socket:");
@@ -657,26 +697,35 @@ public class KVServer implements IKVServer, Runnable {
 		}
 	}
 
-	public void connectECS() {
+	@Override
+	public void process(WatchedEvent event) {
 		try {
-			logger.info("Waiting for ECS connection on port: " 
-					+ serverSocket.getLocalPort());
+			List<String> children = zk.getChildren("/" + serverName, false);
 
-			Socket ecs = serverSocket.accept();                
-			ECSConnection connection = 
-					new ECSConnection(this, ecs);
-			new Thread(connection).start();
-	               
-			logger.info("Connected to ECS coordinator: " 
-					+ ecs.getInetAddress().getHostName() 
-					+  " on port " + ecs.getPort());
+			if (children.isEmpty()) {
+				zk.exists("/" + serverName, true);
+				zk.create("/" + serverName + "/message", "".getBytes() ,
+											ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				zk.exists("/" + serverName + "/message", true);
+				return;
+			}	
 
-		} catch (IOException e) {
-			logger.error("Error! Cannot open server socket:");
-			if(e instanceof BindException){
-				logger.error("Port " + port + " is already bound!");
+			KVAdminMessage message = new KVAdminMessage(zk.getData("/" + serverName + "/message", true, null));
+
+			System.out.println("TEST "+ message.getCommand());
+
+			switch(message.getCommand()) {
+				case "START":
+					start();
+					break;
+				case "STOP":
+					stop();
+					break;
 			}
-		
+
+			zk.exists("/" + serverName + "/message", true);
+		} catch (KeeperException | InterruptedException e) {
+			logger.error("Error processing watcher event!");
 		}
 	}
 
@@ -734,7 +783,7 @@ public class KVServer implements IKVServer, Runnable {
      */
 	public static void main(String[] args) {
     	try {
-			new LogSetup("logs/server.log", Level.ALL);
+			new LogSetup("logs/server.log", Level.INFO);
 			if(args.length != 3) {
 				System.out.println("Error! Invalid number of arguments!");
 				System.out.println("Usage: Server <port> <cache size> <cache strategy>!");

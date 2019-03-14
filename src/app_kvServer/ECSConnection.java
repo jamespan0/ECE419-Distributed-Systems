@@ -71,7 +71,7 @@ public class ECSConnection implements Runnable {
 
 					server.start();
 					
-					sendMessage(new KVAdminMessage("start_success"));
+					sendMessage(new KVAdminMessage("START_SUCCESS"));
 					
 				} catch (Exception e) {
 
@@ -89,7 +89,7 @@ public class ECSConnection implements Runnable {
 
 					server.stop();
 					
-					sendMessage(new KVAdminMessage("stop_success"));
+					sendMessage(new KVAdminMessage("STOP_SUCCESS"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -106,7 +106,7 @@ public class ECSConnection implements Runnable {
 
 					server.lockWrite();
 					
-					sendMessage(new KVAdminMessage("lock_success"));
+					sendMessage(new KVAdminMessage("LOCK_SUCCESS"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -123,7 +123,7 @@ public class ECSConnection implements Runnable {
 
 					server.unLockWrite();
 					
-					sendMessage(new KVAdminMessage("unlock_success"));
+					sendMessage(new KVAdminMessage("UNLOCK_SUCCESS"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -141,7 +141,7 @@ public class ECSConnection implements Runnable {
 
 					server.unLockWrite();
 					
-					sendMessage(new KVAdminMessage("shutdown_success"));
+					sendMessage(new KVAdminMessage("SHUTDOWN_SUCCESS"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
@@ -157,7 +157,7 @@ public class ECSConnection implements Runnable {
 							+ ecsSocket.getPort() + ">: 'ECS: " 
 							+ stringArray[0] + "'");
 					
-					sendMessage(new KVAdminMessage("update_success"));
+					sendMessage(new KVAdminMessage("UPDATE_SUCCESS"));
 				} catch (Exception e) {
 
 					logger.error("Error: ECS command unsuccessful!", e);
