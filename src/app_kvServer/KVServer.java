@@ -5,6 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.math.BigInteger;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.TreeMap;
@@ -81,7 +82,9 @@ public class KVServer implements IKVServer, Runnable {
     private int m2_cachesize;
     private StringBuffer stringBuffer;  //hash of tuple encrypted
     // int to store ports, string stores map
-    private TreeMap <Integer, IECSNode> metadata = new TreeMap<Integer, IECSNode>();
+    private TreeMap <BigInteger, String> metadata = new TreeMap<BigInteger, String>();
+    //private String metadata;
+//    private BigInteger largestKey;
 
 	private boolean running = false;
 	public boolean activated = false;
@@ -147,10 +150,19 @@ public class KVServer implements IKVServer, Runnable {
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(String meta_data, int cacheSize, String strategy) {
+	public void initKVServer(String[] meta_data, int cacheSize, String strategy) {
+
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
 //        serverStatus = serverTypes.SERVER_STOPPED;
+        String serverName = meta_data[0];
+        BigInteger serverHash = new BigInteger(meta_data[1]);
+
+        // add hash and servername into the ring
+        //metadata.lastKey() is the largest key in the hash ring available
+        this.metadata.put(serverHash,serverName);
+
+        // store results of meta_data in struct above
 
         //function to add current storage servers to TreeMap metadata
         activated = false ;
@@ -174,6 +186,28 @@ public class KVServer implements IKVServer, Runnable {
 */
 
 	}
+
+    // returns hash of String
+    public BigInteger hashing(String message) {
+        MessageDigest messageDigest;
+        try {
+            messageDigest = MessageDigest.getInstance("MD5");
+            messageDigest.update(message.getBytes());
+            byte[] messageDigestMD5 = messageDigest.digest();
+            StringBuffer stringBuffer = new StringBuffer();
+            for(byte bytes : messageDigestMD5) {
+                stringBuffer.append(String.format("%02x",bytes & 0xff));
+            } 
+
+            BigInteger result = new BigInteger(stringBuffer.toString());
+            return result;
+
+        } catch(NoSuchAlgorithmException exception) {
+            exception.printStackTrace(); 
+        }
+        BigInteger invalid = new BigInteger("0");
+        return invalid;
+    }
 
 
 	public void start() {
