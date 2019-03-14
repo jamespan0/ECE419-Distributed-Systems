@@ -186,7 +186,7 @@ public class KVServer implements IKVServer, Runnable {
     //metadata is string
     //cacheSize is int
     //replacementstrategy is String
-	public void initKVServer(String[] meta_data, int cacheSize, String strategy) {
+	public void initKVServer(String[] meta_data, int port ,int cacheSize, String strategy) {
 
     //need to figure out how to get metadata
         this.m2_cachesize = cacheSize;
@@ -199,6 +199,7 @@ public class KVServer implements IKVServer, Runnable {
         this.metadata.put(serverHash,serverName);
 
         // store results of meta_data in struct above
+        KVServer newServer = new KVServer(port, cacheSize, strategy) {
 
         //function to add current storage servers to TreeMap metadata
         activated = false ;
