@@ -201,7 +201,7 @@ public class KVServer implements IKVServer, Runnable {
         this.metadata.put(serverHash,meta_data);
 
         // store results of meta_data in struct above
-        KVServer newServer = new KVServer(port, cacheSize, strategy) {
+        KVServer newServer = new KVServer(port, cacheSize, strategy);
 
         //function to add current storage servers to TreeMap metadata
         activated = false ;
