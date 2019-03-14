@@ -28,6 +28,9 @@ import logger.LogSetup;
 
 import org.apache.log4j.*;
 
+import org.apache.zookeeper.*;
+import org.apache.zookeeper.data.*;
+
 import client.KVCommInterface;
 import client.KVStore;
 
@@ -102,6 +105,13 @@ public class KVServer implements IKVServer, Runnable {
 */
 
 
+	//private static final String ZK_CONNECT = "127.0.0.1:2181";
+	//private static final int ZK_TIMEOUT = 2000;
+
+	//private ZooKeeper zk;
+	//private CountDownLatch connectedSignal;
+
+
     /*  M2 variables end */
 
     //M1 KVServer
@@ -144,6 +154,32 @@ public class KVServer implements IKVServer, Runnable {
         else {
             this.cacheStrategy = IKVServer.CacheStrategy.FIFO; //in case of fail, just do FIFO operation
         }
+
+            /*
+			try {
+				connectedSignal = new CountDownLatch(1);
+
+				zk = new ZooKeeper(ZK_CONNECT, ZK_TIMEOUT, new Watcher() {
+					@Override
+					public void process(WatchedEvent event) {
+						if (event.getState() == Watcher.Event.KeeperState.SyncConnected) {
+							connectedSignal.countDown();
+						}
+					}
+				});
+
+				connectedSignal.await();
+
+				logger.info("New ZooKeeper connection at: " + ZK_CONNECT);
+
+				zk.create("/activeNodes/" + port, "".getBytes, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+	
+				logger.info("Znode /activeNodes/" + port + " created");
+
+			} catch (IOException | InterruptedException e) {
+				logger.error(e);
+			}
+            */
         
 	}
 

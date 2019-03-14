@@ -32,15 +32,20 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     private static final int HASH_LOWER_BOUND = 0;
     private static final int HASH_UPPER_BOUND = Integer.parseInt("FFFF", 16);
 
-	private static final String ZK_CONNECT = "127.0.0.1:2181";
-	private static final int ZK_TIMEOUT = 2000;
+	int activeServers;
 
-	private ZooKeeper zk;
-	private CountDownLatch connectedSignal;
+	//private static final String ZK_CONNECT = "127.0.0.1:2181";
+	//private static final int ZK_TIMEOUT = 2000;
+
+	//private ZooKeeper zk;
+	//private CountDownLatch connectedSignal;
     
     private Map<String, IECSNode> nodes;
 
 	public ECSClient() {
+			activeServers = 0;
+
+            /*
 			try {
 				connectedSignal = new CountDownLatch(1);
 
@@ -56,9 +61,15 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 				connectedSignal.await();
 
 				logger.info("New ZooKeeper connection at: " + ZK_CONNECT);
+
+				zk.create("/activeNodes", "".getBytes, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+	
+				logger.info("Znode /activeNodes created");
+
 			} catch (IOException | InterruptedException e) {
 				logger.error(e);
 			}
+            */
 	}
 
 
@@ -69,7 +80,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
             return false;
         }
         for (IECSNode node : nodes.values()) {
-            sendMessage(node, "start");
+            sendMessage(node, "START");
         }
         return true;
     }
@@ -81,7 +92,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
             return false;
         }
         for (IECSNode node : nodes.values()) {
-            sendMessage(node, "stop");
+            sendMessage(node, "STOP");
         }
         return true;
     }
@@ -105,8 +116,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
         
         // initiate ssh call
         Process proc;
-        String script = "ssh -n " + _node.getNodeHost() + " nohup java -jar m2-server.jar " + _node.getNodePort() + " 50000 FIFO &";
-
+        String script = "ssh -n " + _node.getNodeHost() + " nohup java -jar m2-server.jar " + _node.getNodePort() + " " + Integer.toString(cacheSize) + " " + cacheStrategy + " &";
         Runtime run = Runtime.getRuntime();
         try {
           proc = run.exec(script);
@@ -139,9 +149,8 @@ public class ECSClient implements IECSClient, ClientSocketListener {
         int largest = 0;
         int largest_gap = 0;
         int last_number = 0;
-        int i=0;
         
-        String[] keyset = (String[]) nodes.keySet().toArray();
+        String[] keyset = nodes.keySet().toArray(new String[0]);
         Arrays.sort(keyset);
         
         for (String key : keyset) {
@@ -149,13 +158,12 @@ public class ECSClient implements IECSClient, ClientSocketListener {
             int current = hexstr_to_int(key);
             if (find_circular_gap(last_number, current) > largest_gap) {
                 largest_gap = find_circular_gap(last_number, current);
-                largest = i;
+                largest = current;
             }
             last_number = current;
-            i++;
         }
         
-        String[] range = {Integer.toHexString((largest_gap - largest + 1)), Integer.toHexString(largest)};
+        String[] range = {Integer.toHexString((largest - largest_gap)), Integer.toHexString(largest)};
         return range;
     }
     
@@ -168,42 +176,38 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     @Override
     public IECSNode addNode(String cacheStrategy, int cacheSize) {
-		try {
 	
 		    String[] hash_range = hash_insert_loc();
 		    
 		    // update new hash range (lower)
-		    String[] hash_loc = hash_range;
-		    hash_loc[1] = Integer.toHexString((int) hexstr_to_int((hash_range[1]+ hash_range[0]))/2);
-		    
-		    // setup nodes called inside
+		    String[] hash_loc = new String[2];
+                    hash_loc[0] = hash_range[0];
+                    hash_loc[1] = hash_range[1];
+
+                    // check if first node
+                    if (nodes.size() != 0)
+                        hash_loc[1] = Integer.toHexString((int) (hexstr_to_int(hash_range[0]) + hexstr_to_int(hash_range[1]))/2);
+                    
+		    // add new node with the range lower - mid
 		    IECSNode _node = addNodeInternal(cacheStrategy, cacheSize, hash_loc);
 		    try {
-		        awaitNodes(1, 100);
+		        if (awaitNodes(1, 3000)) {
+					activeServers++;
+				}
 		    } catch (Exception e) {
 		        System.out.println("ECSClient addNode Error" + e.getMessage());
 		        return null;
 		    }
 		    nodes.put(hash_loc[1], _node);
 		    
-		    // update old hash range (higher)
-		    String hash_remain = Integer.toHexString(hexstr_to_int(hash_loc[0]) + 1);
-		    String[] hash_range_old = hash_range;
-		    hash_range_old[0] = hash_remain;
-		    update_hash_range(hash_range[1], hash_range_old);
+                    // update old node with the range mid - higher
+                    if (nodes.size() != 1) {
+                        // update old hash range (higher)
+                        hash_range[0] = Integer.toHexString(hexstr_to_int(hash_loc[1]) + 1);
+                        update_hash_range(hash_range[1], hash_range);
+                    }
 
-			String path =  "/" + _node.getNodeName();
-
-			zk.create(path, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-
-			logger.info("New node created at /" + path);
-		    
-		    return _node;
-		} catch (KeeperException | InterruptedException e) {
-			logger.error("Error adding new node!");
-
-			return null;
-		}
+                    return _node;
     }
 
     @Override
@@ -217,37 +221,78 @@ public class ECSClient implements IECSClient, ClientSocketListener {
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        int port = 0;
+        int port = 8000;
         // to have hash as the name put "TEST_USE_HASH"
+        // Get from available nodes with ecs.config
         IECSNode _node = (IECSNode) new ECSNode("TEST_USE_HASH", "127.0.0.1", port, null);
         ArrayList<IECSNode> _nodes = new ArrayList<IECSNode>();
+        
+        // create zookeper node here
+                    
+		// ZK commented
+		/*
+		try {
+			String path =  "/" + _node.getNodeName();
+			zk.create(path, "".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+
+			logger.info("New node created at /" + path);
+				
+			return _node;
+		} catch (KeeperException | InterruptedException e) {
+			logger.error("Error adding new node!");
+
+			return null;
+		}
+        */
+        
         _nodes.add(_node);
         return _nodes;
     }
 
     @Override
     public boolean awaitNodes(int count, int timeout) throws Exception {
-        return true;
+        
+        long currentTime = System.currentTimeMillis();
+
+		while (System.currentTimeMillis() - currentTime < timeout) {
+			/*List<String> activeNodes = zk.getChildren("/activeNodes", true);
+
+			if (activeNodes.size() == activeServers + count) {
+				return true;
+			}*/
+		}
+        
+        return false;
     }
     
     private void shutdownNode(IECSNode node) {
-        sendMessage(node, "shutdown");
+        sendMessage(node, "SHUT_DOWN");
     }
 
     @Override
     public boolean removeNodes(Collection<String> nodeNames) {
-        String[] _nodeNames = (String[]) nodeNames.toArray();
+        String[] _nodeNames = nodeNames.toArray(new String[nodeNames.size()]);
         boolean somenotdeleted = false;
-        for (int i=0; i<=nodeNames.size(); i++) {
-            
+        for (int i=0; i<nodeNames.size(); i++) {
+            System.out.println(i);
             // attempt deletion
             if (nodes.containsKey(_nodeNames[i])) {
                 IECSNode _node = nodes.remove(_nodeNames[i]);
                 shutdownNode(_node);
+
+				/*try {
+					String path = "/" + _nodeNames[i];
+
+					Stat st = zk.exists(path, false);
+					zk.delete(path, st.getVersion());
+				} catch (KeeperException | InterruptedException e) {
+					logger.error("Error! Znode deletion failed.");
+				}*/
             }
             else somenotdeleted = true;
             
         }
+
         return !somenotdeleted;
     }
     
@@ -415,7 +460,7 @@ public class ECSClient implements IECSClient, ClientSocketListener {
                         for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
                             IECSNode _node = entry.getValue();
                             System.out.print(PROMPT + "Node: " + entry.getKey() + "\t\tHash Range: " + _node.getNodeHashRange()[0] + "-" + _node.getNodeHashRange()[1]);
-                            System.out.println("\t\tHost: " + entry.getValue().getNodeName() + ":" + entry.getValue().getNodePort());
+                            System.out.println("\t\tHost: " + entry.getValue().getNodeHost() + ":" + entry.getValue().getNodePort());
                         }
                         
                         break;   
@@ -459,27 +504,6 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     }
     
     private void printHelp() {
-
-	try {
-		Stat test = zk.exists("/testing", true);
-
-		if(test == null){
-			zk.create("/testing", "abcdefg".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-		}
-				//zk.create("/testing", "abcdefg".getBytes(), ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-				System.out.println("hello");
-
-				System.out.println("asdlapwldwpaldpwld: " + new String(zk.getData("/testing", new Watcher(){
-					@Override
-					public void process(WatchedEvent event) {
-
-					}
-
-				}, new Stat())));
-	} catch (KeeperException | InterruptedException e) {
-
-	}
-
                 StringBuilder sb = new StringBuilder();
                 sb.append("HELP (Usage):\n");
                 sb.append("::::::::::::::::::::::::::::::::");
@@ -501,7 +525,11 @@ public class ECSClient implements IECSClient, ClientSocketListener {
     
     public static void main(String[] args) {
     	try {
-			new LogSetup("logs/ecs.log", Level.INFO);
+            new LogSetup("logs/ecs.log", Level.INFO);
+            
+            // Get file from command line arg
+            
+            
             ECSClient app = new ECSClient();
             app.nodes = new HashMap<String, IECSNode>();
             app.run();
