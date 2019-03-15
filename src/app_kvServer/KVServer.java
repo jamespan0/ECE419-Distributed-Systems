@@ -120,13 +120,6 @@ public class KVServer implements IKVServer, Runnable, Watcher {
 */
 
 
-	//private static final String ZK_CONNECT = "127.0.0.1:2181";
-	//private static final int ZK_TIMEOUT = 2000;
-
-	//private ZooKeeper zk;
-	//private CountDownLatch connectedSignal;
-
-
     /*  M2 variables end */
 
     //M1 KVServer
@@ -199,6 +192,9 @@ public class KVServer implements IKVServer, Runnable, Watcher {
 					zk.setData("/" + serverName + "/message", "".getBytes(), st.getVersion());
 					st = zk.exists("/" + serverName + "/message", true);
 				}
+
+				zk.create("/activeNodes/" + serverName, "".getBytes(),
+												ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 	
 				logger.info("Znode /" + serverName + " initialized");
 

@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
 import java.nio.ByteBuffer;
@@ -138,7 +139,7 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 			try {
 				Stat st = zk.exists("/TEST_USE_HASH/message", true);
 
-				zk.setData("/TEST_USE_HASH/message", "INIT 10 FIFO aodkwaokdowkdwoko".getBytes(), st.getVersion());
+				zk.setData("/TEST_USE_HASH/message", "STOP".getBytes(), st.getVersion());
 			} catch (KeeperException | InterruptedException e) {
 
 			}
@@ -287,11 +288,11 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
         long currentTime = System.currentTimeMillis();
 
 		while (System.currentTimeMillis() - currentTime < timeout) {
-			/*List<String> activeNodes = zk.getChildren("/activeNodes", true);
+			List<String> activeNodes = zk.getChildren("/activeNodes", true);
 
 			if (activeNodes.size() == activeServers + count) {
 				return true;
-			}*/
+			}
 		}
         
         return false;
