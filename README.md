@@ -2,7 +2,7 @@
 Implementation of key-value pair storage servers using concepts and techniques from distributed systems course.
 
 <p align="center">
-  <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="500px">
+  <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="400px">
 </p>
 
 ### Milestone 1: 
