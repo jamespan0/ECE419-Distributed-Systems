@@ -1,13 +1,6 @@
 # ECE419 Distributed Systems Project
 Implementation of key-value pair storage servers using concepts and techniques from distributed systems course.
 
-<p align="center">
-  <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="400px">
-</p>
-<p align="center">
-  <img src="https://imgur.com/vDYrqIB.png" width="600px" height="400px">
-</p>
-
 ### Milestone 1: 
 Simple single-server storage with client communications. Cache for quicker lookup on storage server.
 
@@ -19,3 +12,11 @@ Implementation of replication, allowing for clients to request from multiple ser
 
 ### Milestone 4: 
 Notification system to identify changes to watched key-value pairs.
+
+<p align="center">
+  <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="400px">
+</p>
+
+<p align="center">
+  <img src="https://imgur.com/vDYrqIB.png" width="600px" height="400px">
+</p>
