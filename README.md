@@ -4,6 +4,9 @@ Implementation of key-value pair storage servers using concepts and techniques f
 <p align="center">
   <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="400px">
 </p>
+<p align="center">
+  <img src="https://imgur.com/vDYrqIB.png" width="600px" height="400px">
+</p>
 
 ### Milestone 1: 
 Simple single-server storage with client communications. Cache for quicker lookup on storage server.
