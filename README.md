@@ -2,8 +2,8 @@
 Implementation of key-value pair storage servers using concepts and techniques from distributed systems course.
 
 <p align="center>
-  <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="500px" />
-                                                                                      </p>
+  <img src="https://i.imgur.com/ZMSKtqJ.png" width="600px" height="500px">
+</p>
 ### Milestone 1: 
 Simple single-server storage with client communications. Cache for quicker lookup on storage server.
 
