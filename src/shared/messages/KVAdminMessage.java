@@ -75,14 +75,15 @@ public class KVAdminMessage implements Serializable {
             return null;
         }
 
-        public String getMetadata() {
+        public String getMetaData() {
             
             String[] tokens = getMsg().split("\\s+");
             
-            if (tokens.length > 2) {
+            if (tokens[0].equals("INIT")) {
             	tokens = getMsg().split(" ", 4);
 				return tokens[3];
             } else {
+            	tokens = getMsg().split(" ", 2);
 				return tokens[1];
 			}
         }

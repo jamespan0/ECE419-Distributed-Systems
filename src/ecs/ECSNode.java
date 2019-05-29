@@ -50,5 +50,9 @@ public class ECSNode implements IECSNode {
     public String[] getNodeHashRange() {
         return nodeHashRange;
     }
+
+    public void setNodeHashRange(String[] _nodehashrange) {
+        nodeHashRange = _nodehashrange;
+    }
     
 }

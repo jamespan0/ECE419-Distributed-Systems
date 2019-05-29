@@ -1,18 +1,11 @@
 package app_kvECS;
 
-import java.util.Map;
-import java.util.Collection;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 
 import java.nio.ByteBuffer;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.IOException;
+import java.io.*;
 
 import ecs.ECSNode;
 import ecs.IECSNode;
@@ -27,6 +20,8 @@ import org.apache.log4j.*;
 
 import org.apache.zookeeper.*;
 import org.apache.zookeeper.data.*;
+
+import org.json.*;
 
 public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 
@@ -44,12 +39,35 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 	private CountDownLatch connectedSignal;
     
     private Map<String, IECSNode> nodes;
+    private Map<String, String[]> replicaOf = new HashMap<String, String[]>();
+    private Map<String, String[]> replicas = new HashMap<String, String[]>();
+    private Queue<IECSNode> availableNodes = new LinkedList<>();
 
-	public ECSClient() {
+	private boolean transferSuccess = false;
+
+	ECSServerMonitor serverMonitor;
+
+	public ECSClient(String configFileName) {
 			activeServers = 0;
 
+			serverMonitor = new ECSServerMonitor(this);
+			serverMonitor.running = true;
+			new Thread(serverMonitor).start();
             
 			try {
+				BufferedReader reader = new BufferedReader(new FileReader(new File(configFileName)));
+
+				String line;
+
+				while ((line = reader.readLine()) != null) {
+					String[] tokens = line.split(" ");
+
+					ECSNode temp = new ECSNode(tokens[0], tokens[1], Integer.parseInt(tokens[2]), null);
+
+					availableNodes.add(temp);
+				}
+
+
 				connectedSignal = new CountDownLatch(1);
 
 				zk = new ZooKeeper(ZK_CONNECT, ZK_TIMEOUT, new Watcher() {
@@ -83,8 +101,18 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 					zk.setData("/ecsMessages", "".getBytes(), st.getVersion());
 					st = zk.exists("/ecsMessages", this);
 				}
+
+				st = zk.exists("/dataWatch", false);
+				
+				if (st == null) {
+					zk.create("/dataWatch", "".getBytes(),
+												ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+				} else {
+					zk.setData("/dataWatch", "".getBytes(), st.getVersion());
+					st = zk.exists("/dataWatch", this);
+				}
 	
-				logger.info("Znode /activeNodes initialized");
+				logger.info("Znodes initialized");
 
 			} catch (KeeperException | IOException | InterruptedException e) {
 				logger.error(e);
@@ -97,7 +125,12 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 		try {
 			String message = new String(zk.getData("/ecsMessages", this, null));
 
-			if (message != "") {
+			String[] tokens = message.split(" ");
+
+			if(message.equals("TRANSFER_SUCCESS")) {
+				logger.info("Server data transfer successful");
+				transferSuccess = true;
+			} else if (!message.equals("")) {
 				logger.info("Received Message: " + message);
 				System.out.print(PROMPT);
 			}
@@ -114,12 +147,11 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
             return false;
         }
         for (IECSNode node : nodes.values()) {
-            //sendMessage(node, "START");
-
 			try {
-				Stat st = zk.exists("/TEST_USE_HASH/message", true);
+				Stat st = zk.exists("/" + node.getNodeName() +"/message", true);
 
-				zk.setData("/TEST_USE_HASH/message", "START".getBytes(), st.getVersion());
+				zk.setData("/" + node.getNodeName() +"/message", "START".getBytes(), st.getVersion());
+
 			} catch (KeeperException | InterruptedException e) {
 
 			}
@@ -134,12 +166,10 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
             return false;
         }
         for (IECSNode node : nodes.values()) {
-            //sendMessage(node, "STOP");
-
 			try {
-				Stat st = zk.exists("/TEST_USE_HASH/message", true);
+				Stat st = zk.exists("/" + node.getNodeName() +"/message", true);
 
-				zk.setData("/TEST_USE_HASH/message", "STOP".getBytes(), st.getVersion());
+				zk.setData("/" + node.getNodeName() +"/message", "STOP".getBytes(), st.getVersion());
 			} catch (KeeperException | InterruptedException e) {
 
 			}
@@ -149,24 +179,56 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
 
     @Override
     public boolean shutdown() {
-        removeAllNodes();
-        stop = true;
-        System.out.println(PROMPT + "Application exit!");
+		try {
+			serverMonitor.running = false;
+			List<String> children = zk.getChildren("/activeNodes", false);
+
+			for (String child : children) {
+				Stat st = zk.exists("/activeNodes/" + child, false);
+				zk.delete("/activeNodes/" + child, st.getVersion());
+			}
+
+			children = zk.getChildren("/dataWatch", false);
+
+			for (String child : children) {
+				Stat st = zk.exists("/dataWatch/" + child, false);
+				zk.delete("/dataWatch/" + child, st.getVersion());
+			}
+
+		    Process proc;
+		    String script = "pkill -f m2-server";
+		    Runtime run = Runtime.getRuntime();
+		    proc = run.exec(script);
+
+			removeAllNodes();
+			stop = true;
+			System.out.println(PROMPT + "Application exit!");
+
+		} catch (Exception e) {
+			logger.error(e);
+		}
+
         return true;
     }
 
     private IECSNode addNodeInternal(String cacheStrategy, int cacheSize, String[] hash_range) {
-        int port = 0;
-        
-        Collection<IECSNode> _nodes = setupNodes(1, cacheStrategy, cacheSize);
-        IECSNode old_node = (IECSNode) (_nodes.toArray())[0];
+
+		IECSNode old_node = null;
+		if(availableNodes.peek() != null) {
+			 old_node = (IECSNode) availableNodes.remove();
+		} else {
+			return null;
+		}
+
+
         String name = old_node.getNodeName();
-        if (name.equals("TEST_USE_HASH")) name = hash_range[1];
+
         ECSNode _node = new ECSNode(name, old_node.getNodeHost() , old_node.getNodePort(), hash_range);
         
         // initiate ssh call
         Process proc;
-        String script = "ssh -n " + _node.getNodeHost() + " nohup java -jar m2-server.jar " + _node.getNodePort() + " " + Integer.toString(cacheSize) + " " + cacheStrategy + " &";
+        String script = "ssh -n " + _node.getNodeHost() + " nohup java -jar m2-server.jar " + _node.getNodePort() + " " + _node.getNodeName() + " &";
+
         Runtime run = Runtime.getRuntime();
         try {
           proc = run.exec(script);
@@ -180,11 +242,224 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
     private int hexstr_to_int(String hex) {
         return Integer.parseInt(hex, 16);
     }
+
+	private String getMetadata(boolean transfer) {
+		JSONObject metaData = new JSONObject();
+
+		for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
+            IECSNode _node = entry.getValue();
+
+			JSONObject nodeData = new JSONObject();
+
+			String[] replicas_ = replicas.get(_node.getNodeName());
+			String[] isReplica = replicaOf.get(_node.getNodeName());
+		
+			nodeData.put("host", _node.getNodeHost());
+			nodeData.put("port", _node.getNodePort());
+			nodeData.put("rangeLow", _node.getNodeHashRange()[0]);
+			nodeData.put("rangeHigh", _node.getNodeHashRange()[1]);
+			if(replicas_ != null){
+				nodeData.put("replicas", replicas_);
+			} else {
+				String[] empty = {"",""};
+				nodeData.put("replicas", empty);
+			}
+			if(isReplica != null){
+				nodeData.put("replicaOf", isReplica);
+			} else {
+				String[] empty = {"",""};
+				nodeData.put("replicaOf", empty);
+			}
+
+			metaData.put("transfer", transfer);
+			metaData.put(_node.getNodeName(), nodeData);
+		}
+
+		return metaData.toString();
+	}
+
+	private void updateReplicas(String coordinator) {
+		String[] replicas_ = new String[2];
+		replicas_[0] = "";
+		replicas_[1] = "";
+		int coordinatorInt = Integer.parseInt(coordinator, 16);
+
+		// only 1 node, no replicas
+		if(nodes.size() > 1) {
+			int low1 = 0;
+			int low2 = 0;
+			int next1 = -1;
+			int next2 = -1;
+			for (String key : nodes.keySet()) {
+				if(!key.equals(coordinator)) {
+					int keyInt = Integer.parseInt(key, 16);
+					if (low1 == 0){
+						low1 = keyInt;
+						low2 = keyInt;
+					}
+
+					if (keyInt < low1) {
+						if(low2 != low1){
+							low2 = low1;
+						}
+
+						low1 = keyInt;
+					}
+	
+					if (low2 == low1) {
+						low2 = keyInt;
+					}
+
+					if (keyInt < low2 && keyInt != low1) {
+						low2 = keyInt;
+					}
+					
+					if (keyInt > coordinatorInt && next1 == -1){
+						next1 = keyInt;
+						next2 = keyInt;
+					}
+
+					if (keyInt > coordinatorInt && keyInt < next1) {
+						if (next2 != next1) {
+							next2 = next1;
+						}
+							
+						next1 = keyInt;
+					}
+
+	
+					if (next2 == next1 && keyInt > next1) {
+						next2 = keyInt;
+					}
+
+					if (keyInt > next1 && keyInt < next2) {
+						next2 = keyInt;
+					}
+				}				
+			}
+
+
+			if(next1 == -1) {
+				next1 = low1;
+				next2 = low2;
+			} else if (next2 == -1 || next2 == next1){
+				next2 = low1;
+			}
+
+			if(next1 != 0){
+				replicas_[0] = Integer.toHexString(next1);
+			}
+
+			if(next2 != 0 && next2 != next1){
+				replicas_[1] = Integer.toHexString(next2);
+			}
+
+		}
+
+		String coordinatorName = nodes.get(coordinator).getNodeName();
+
+		if(!replicas_[0].equals("")){
+			String[] temp = replicaOf.get(nodes.get(replicas_[0]).getNodeName());
+
+			if(temp != null){
+
+				if(!temp[0].equals(coordinatorName)){
+					temp[1] = coordinatorName;
+				}
+			} else {
+				temp = new String[2];
+				temp[0] = coordinatorName;
+				temp[1] = "";
+			}
+
+			replicaOf.put(nodes.get(replicas_[0]).getNodeName(), temp);
+		}
+
+		if(!replicas_[1].equals("")){
+			String[] temp = replicaOf.get(nodes.get(replicas_[1]).getNodeName());
+
+			if(temp != null){
+
+				if(!temp[0].equals(coordinatorName)){
+					temp[1] = coordinatorName;
+				}
+			} else {
+				temp = new String[2];
+				temp[0] = coordinatorName;
+				temp[1] = "";
+			}
+
+			replicaOf.put(nodes.get(replicas_[1]).getNodeName(), temp);
+		}
+
+		if(!replicas_[0].equals("")){
+			replicas_[0] = nodes.get(replicas_[0]).getNodeName();
+		}
+
+		if(!replicas_[1].equals("")){
+			replicas_[1] = nodes.get(replicas_[1]).getNodeName();
+		}
+
+		replicas.put(nodes.get(coordinator).getNodeName(), replicas_);
+	}
     
-    private boolean update_hash_range(String oldkey, String[] range) {
+    private boolean update_hash_range(String oldkey, String[] range, String newNode, int cacheSize,
+																String cacheStrategy, boolean firstNode) {
         if (nodes.containsKey(oldkey)) {
             IECSNode oldnode = nodes.remove(oldkey);
+
+			String name = oldnode.getNodeName();
+
             nodes.put(range[1], new ECSNode(oldnode.getNodeName(), oldnode.getNodeHost(), oldnode.getNodePort(), range));
+
+		for (Map.Entry<String, IECSNode> temp : nodes.entrySet()) {
+			updateReplicas(temp.getValue().getNodeHashRange()[1]);
+		}
+			try {
+				if (!firstNode) {				
+					int timeout = 1000;
+					long currentTime = System.currentTimeMillis();
+
+					while (System.currentTimeMillis() - currentTime < timeout) {
+
+					}
+
+					zk.setData("/" + newNode +"/message", ("INIT " + cacheSize + " " + cacheStrategy + " " + 
+												getMetadata(false)).getBytes(), zk.exists("/" + newNode +"/message", true).getVersion());
+					
+					//add initialized server to monitor
+					serverMonitor.testActive.add(newNode);
+				}
+				zk.setData("/" + name +"/message", ("UPDATE " + getMetadata(true)).getBytes(),
+												zk.exists("/" + name + "/message", true).getVersion());
+
+				//WAIT FOR TRANSFER COMPLETION
+				int timeout = 10000;
+				long currentTime = System.currentTimeMillis();
+
+				logger.info("Waiting for transfer of server data...");
+
+				while (System.currentTimeMillis() - currentTime < timeout && !transferSuccess) {
+					//getData Progress
+				}
+
+				transferSuccess = false;
+
+		       for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
+		            String nodeName = entry.getValue().getNodeName();
+
+					if(!nodeName.equals(name) && !nodeName.equals(newNode)) {
+						zk.setData("/" + nodeName +"/message", ("UPDATE " + getMetadata(false)).getBytes(),
+													zk.exists("/" + nodeName + "/message", true).getVersion());
+
+					}
+				}
+
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+
             return true;
         }
         return false;
@@ -237,26 +512,49 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
                     // check if first node
                     if (nodes.size() != 0)
                         hash_loc[1] = Integer.toHexString((int) (hexstr_to_int(hash_range[0]) + hexstr_to_int(hash_range[1]))/2);
+					if(!hash_loc[0].equals("0")){
+						hash_loc[0] = Integer.toHexString(Integer.parseInt(hash_loc[0], 16) + 1);
+					}
                     
 		    // add new node with the range lower - mid
 		    IECSNode _node = addNodeInternal(cacheStrategy, cacheSize, hash_loc);
+			
+			if(_node == null){
+				System.out.println("Error! No more available servers!");
+				return null;
+			}
+
 		    try {
-		        if (awaitNodes(1, 3000)) {
+		        if (awaitNodes(1, 10000)) {
 					activeServers++;
-				}
-		    } catch (Exception e) {
-		        System.out.println("ECSClient addNode Error" + e.getMessage());
-		        return null;
-		    }
-		    nodes.put(hash_loc[1], _node);
-		    
+				       
+		    		nodes.put(hash_loc[1], _node);
+
+					boolean firstNode = true;
+
+
+					if (nodes.size() == 1) {
+						zk.setData("/" + _node.getNodeName() +"/message", ("INIT " + cacheSize + " " + cacheStrategy + " " + 
+												getMetadata(false)).getBytes(),
+													zk.exists("/" + _node.getNodeName() +"/message", true).getVersion());
+						//add initialized server to monitor
+						serverMonitor.testActive.add(_node.getNodeName());
+					} else {
+						firstNode = false;
+					}
+
                     // update old node with the range mid - higher
                     if (nodes.size() != 1) {
                         // update old hash range (higher)
                         hash_range[0] = Integer.toHexString(hexstr_to_int(hash_loc[1]) + 1);
-                        update_hash_range(hash_range[1], hash_range);
-                    }
-
+                        update_hash_range(hash_range[1], hash_range, _node.getNodeName(), cacheSize, cacheStrategy, firstNode);
+        			}
+				}
+		    } catch (Exception e) {
+		        System.out.println("ECSClient addNode Error" + e);
+				e.printStackTrace();
+		        return null;
+		    }
                     return _node;
     }
 
@@ -264,21 +562,30 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
     public Collection<IECSNode> addNodes(int count, String cacheStrategy, int cacheSize) {
         
         ArrayList<IECSNode> _nodes = new ArrayList<IECSNode>();
-        for (int i=0; i<count; i++ ) _nodes.add(addNode(cacheStrategy, cacheSize));
+
+        for (int i=0; i<count; i++ ) {
+			IECSNode node = addNode(cacheStrategy, cacheSize);
+			if(node == null) {
+				return null;
+			}
+			_nodes.add(node);
+		}
+
         return _nodes;
         
     }
 
     @Override
     public Collection<IECSNode> setupNodes(int count, String cacheStrategy, int cacheSize) {
-        int port = 8000;
-        // to have hash as the name put "TEST_USE_HASH"
-        // Get from available nodes with ecs.config
-        IECSNode _node = (IECSNode) new ECSNode("TEST_USE_HASH", "127.0.0.1", port, null);
+
+		IECSNode _node = null;
         ArrayList<IECSNode> _nodes = new ArrayList<IECSNode>();
+
+		if(availableNodes.peek() != null) {
+			 _node = (IECSNode) availableNodes.remove();
+        	_nodes.add(_node);
+		}
         
-        
-        _nodes.add(_node);
         return _nodes;
     }
 
@@ -299,12 +606,11 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
     }
     
     private void shutdownNode(IECSNode node) {
-        //sendMessage(node, "SHUT_DOWN");
 
 			try {
-				Stat st = zk.exists("/TEST_USE_HASH/message", true);
+				Stat st = zk.exists("/" + node.getNodeName() +"/message", true);
 
-				zk.setData("/TEST_USE_HASH/message", "SHUT_DOWN".getBytes(), st.getVersion());
+				zk.setData("/" + node.getNodeName() +"/message", "SHUT_DOWN".getBytes(), st.getVersion());
 			} catch (KeeperException | InterruptedException e) {
 
 			}
@@ -312,31 +618,209 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
     }
 
     @Override
-    public boolean removeNodes(Collection<String> nodeNames) {
+    public boolean removeNodes(Collection<String> nodeNames) {return false;};
+
+    public boolean removeNodes(Collection<String> nodeNames, boolean failed) {
         String[] _nodeNames = nodeNames.toArray(new String[nodeNames.size()]);
         boolean somenotdeleted = false;
-        for (int i=0; i<nodeNames.size(); i++) {
-            System.out.println(i);
-            // attempt deletion
-            if (nodes.containsKey(_nodeNames[i])) {
-                IECSNode _node = nodes.remove(_nodeNames[i]);
-                shutdownNode(_node);
 
-				/*try {
-					String path = "/" + _nodeNames[i];
+           for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
+                IECSNode _node = entry.getValue();
 
-					Stat st = zk.exists(path, false);
-					zk.delete(path, st.getVersion());
-				} catch (KeeperException | InterruptedException e) {
-					logger.error("Error! Znode deletion failed.");
-				}*/
-            }
-            else somenotdeleted = true;
-            
-        }
+				if(_node.getNodeName().equals(_nodeNames[0])){
+		            //shutdownNode(_node);
+									
+					int rangeLow = Integer.parseInt(_node.getNodeHashRange()[0], 16);
+					int rangeHigh = Integer.parseInt(_node.getNodeHashRange()[1], 16);
 
-        return !somenotdeleted;
+					IECSNode nodeAbove = _node;
+					IECSNode nodeBelow = _node;
+
+					String transferHost;
+					int transferPort;
+
+					nodes.remove(entry.getKey());
+					if(rangeLow == 0) {
+						int temp = rangeHigh + 1;
+
+						for (Map.Entry<String, IECSNode> entry_ : nodes.entrySet()){
+							IECSNode tempNode = entry_.getValue();
+							int tempRangeLow = Integer.parseInt(tempNode.getNodeHashRange()[0], 16);
+
+							if(tempRangeLow == temp) {
+								nodeAbove = tempNode;
+								break;
+							}
+						}
+
+						transferHost = nodeAbove.getNodeHost();
+						transferPort = nodeAbove.getNodePort();
+						String[] newRange = {_node.getNodeHashRange()[0], nodeAbove.getNodeHashRange()[1]};
+						nodeAbove.setNodeHashRange(newRange);
+					} else if (rangeHigh == 65535) {
+						int temp = rangeLow - 1;
+						nodeBelow = nodes.get(Integer.toHexString(temp));
+					
+						transferHost = nodeBelow.getNodeHost();
+						transferPort = nodeBelow.getNodePort();
+						String[] newRange = {nodeBelow.getNodeHashRange()[0], _node.getNodeHashRange()[1]};
+						nodeBelow = nodes.remove(nodeBelow.getNodeHashRange()[1]);
+						IECSNode newNodeBelow = new ECSNode(nodeBelow.getNodeName(), nodeBelow.getNodeHost(), 
+																						nodeBelow.getNodePort(), newRange);
+						nodes.put(newRange[1], newNodeBelow);
+					} else {
+						int temp = rangeHigh + 1;
+
+						for (Map.Entry<String, IECSNode> entry_ : nodes.entrySet()){
+							IECSNode tempNode = entry_.getValue();
+							int tempRangeLow = Integer.parseInt(tempNode.getNodeHashRange()[0], 16);
+
+							if(tempRangeLow == temp) {
+								nodeAbove = tempNode;
+								break;
+							}
+						}
+
+						temp = rangeLow - 1;
+						nodeBelow = nodes.get(Integer.toHexString(temp));
+
+						int checkRange1 = Integer.parseInt(nodeAbove.getNodeHashRange()[1], 16) - 
+																Integer.parseInt(nodeAbove.getNodeHashRange()[0], 16);
+						int checkRange2 = Integer.parseInt(nodeBelow.getNodeHashRange()[1], 16) - 
+																Integer.parseInt(nodeBelow.getNodeHashRange()[0], 16);
+
+						if(checkRange1 <= checkRange2) {
+							transferHost = nodeAbove.getNodeHost();
+							transferPort = nodeAbove.getNodePort();
+							String[] newRange = {_node.getNodeHashRange()[0], nodeAbove.getNodeHashRange()[1]};
+							nodeAbove.setNodeHashRange(newRange);
+						} else {
+							transferHost = nodeBelow.getNodeHost();
+							transferPort = nodeBelow.getNodePort();
+							String[] newRange = {nodeBelow.getNodeHashRange()[0], _node.getNodeHashRange()[1]};
+							nodeBelow = nodes.remove(nodeBelow.getNodeHashRange()[1]);
+							IECSNode newNodeBelow = new ECSNode(nodeBelow.getNodeName(), nodeBelow.getNodeHost(), nodeBelow.getNodePort(), newRange);
+							nodes.put(newRange[1], newNodeBelow);
+
+						}
+					}
+					try {
+						if(!failed){
+							zk.setData("/" + _node.getNodeName() +"/message", ("SHUT_DOWN " + transferHost + " " + transferPort).getBytes(), zk.exists("/" + _node.getNodeName() +"/message", true).getVersion());
+
+							int timeout = 10000;
+							long currentTime = System.currentTimeMillis();
+
+							logger.info("Waiting for transfer of server data...");
+
+							while (System.currentTimeMillis() - currentTime < timeout && !transferSuccess) {
+								//getData Progress
+							}
+
+							transferSuccess = false;
+						}
+
+						String path = "/" + _nodeNames[0];
+
+						zk.delete("/activeNodes" + path, zk.exists("/activeNodes" + path, false).getVersion());
+						activeServers--;
+						zk.delete(path + "/message", zk.exists(path + "/message", false).getVersion());
+						zk.delete(path + "/heartbeat", zk.exists(path + "/heartbeat", false).getVersion());
+						zk.delete(path, zk.exists(path, false).getVersion());
+
+						ECSNode temp = new ECSNode(_node.getNodeName(), _node.getNodeHost(), _node.getNodePort(), null);
+
+						if(!failed){
+							availableNodes.add(temp);
+						}
+
+					
+					   	for (Map.Entry<String, IECSNode> entry_ : nodes.entrySet()) {
+						    String nodeName = entry_.getValue().getNodeName();
+
+							zk.setData("/" + nodeName +"/message", ("UPDATE " + getMetadata(false)).getBytes(),
+															zk.exists("/" + nodeName + "/message", true).getVersion());
+						}
+					} catch (KeeperException | InterruptedException e) {
+						logger.error("Error! Znode deletion failed: " + e);
+						e.printStackTrace();
+					}
+					return true;
+		        }
+			}
+
+
+        return false;
     }
+
+	public void replace(String failedNode){
+		try {
+			String path = "/" + failedNode;
+
+			zk.delete("/activeNodes" + path, zk.exists("/activeNodes" + path, false).getVersion());
+			activeServers--;
+			zk.delete(path + "/message", zk.exists(path + "/message", false).getVersion());
+			zk.delete(path + "/heartbeat", zk.exists(path + "/heartbeat", false).getVersion());
+			zk.delete(path, zk.exists(path, false).getVersion());
+
+			for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
+				IECSNode node = entry.getValue();
+
+				if(node.getNodeName().equals(failedNode)){
+					IECSNode old_node = null;
+					if(availableNodes.peek() != null) {
+						old_node = (IECSNode) availableNodes.remove();
+
+						IECSNode newNode = new ECSNode(failedNode, old_node.getNodeHost() , old_node.getNodePort(), node.getNodeHashRange());
+						String range = node.getNodeHashRange()[1];
+						nodes.remove(range);
+
+						Process proc;
+						String script = "ssh -n " + newNode.getNodeHost() + " nohup java -jar m2-server.jar " + newNode.getNodePort() + " " + failedNode + " &";
+
+						Runtime run = Runtime.getRuntime();
+						proc = run.exec(script);
+
+						nodes.put(range, newNode);
+
+						int timeout = 1000;
+						long currentTime = System.currentTimeMillis();
+
+						while (System.currentTimeMillis() - currentTime < timeout) {
+
+						}
+
+						zk.setData("/" + failedNode +"/message", ("INIT 10 FIFO " + 
+													getMetadata(false)).getBytes(), zk.exists("/" + failedNode +"/message", true).getVersion());
+					
+						//add initialized server to monitor
+						serverMonitor.testActive.add(failedNode);
+
+
+
+						   for (Map.Entry<String, IECSNode> entry2 : nodes.entrySet()) {
+								String nodeName = entry2.getValue().getNodeName();
+
+								if(!nodeName.equals(failedNode)) {
+									zk.setData("/" + nodeName +"/message", ("UPDATE " + getMetadata(false)).getBytes(),
+																zk.exists("/" + nodeName + "/message", true).getVersion());
+
+								}
+							}
+
+
+					} else {
+						ArrayList<String> list = new ArrayList<String>();
+		                list.add(failedNode);
+						removeNodes(list, true);
+					}
+				}
+			}
+		} catch (Exception e){
+			logger.error(e);
+			e.printStackTrace();
+		}
+	}
     
     public void removeAllNodes() {
         for (IECSNode value: nodes.values())
@@ -357,100 +841,12 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
     // Network Conenction
     boolean connected = false;
     private boolean stop = false;
-    private static final String PROMPT = "ECSClient> ";
-    private BufferedReader stdin;
-    
+    public static final String PROMPT = "ECSClient> ";
+    private BufferedReader stdin; 
 
-    public void handleNewAdminMessage(KVAdminMessage msg) {
-		if (connected) {
-                    if(!stop) {
-                        System.out.println("Server reply: " + msg.getMsg());
-                    }
-                    System.out.print(PROMPT);
-                } else {
+    public void handleNewMessage(TextMessage msg){}
 
-                    if (msg.getMsg().indexOf("Connection to storage server established:") != 0) {
-                            connected = true;
-                    }
-
-                    System.out.println(msg.getMsg());
-                    System.out.print(PROMPT);
-		}
-    }
-    
-
-    public void handleNewMessage(TextMessage msg) {
-		if (connected) {
-                    if(!stop) {
-                        System.out.println("Server reply: " + msg.getMsg());
-                    }
-                    System.out.print(PROMPT);
-                } else {
-
-                    if (msg.getMsg().indexOf("Connection to storage server established:") != 0) {
-                            connected = true;
-                    }
-
-                    System.out.println(msg.getMsg());
-                    System.out.print(PROMPT);
-		}
-    }
-
-    public void handleStatus(ClientSocketListener.SocketStatus status) {
-        
-            /*
-            if(null != status) switch (status) {
-
-            case CONNECTED:
-                break;
-
-            case DISCONNECTED:
-                System.out.print(PROMPT);
-                System.out.println("Connection terminated: ");
-                break;
-
-            case CONNECTION_LOST:
-                System.out.println("Connection lost: "
-                        + serverAddress + " / " + serverPort);
-                System.out.print(PROMPT);
-                break;
-
-            default:
-                break;
-            }
-            */
-
-    }
-        
-    private void sendMessage(IECSNode node, String message) {
-        String address = node.getNodeHost();
-        int port = node.getNodePort();
-        KVStore connection = new KVStore(address, port);
-        try {
-            connection.connect();
-        } catch (Exception e) {
-            printError("Connection Failed!");
-            return;
-        }
-        
-        connection.addListener(this);
-        connection.start();
-        
-        if(connection.isRunning()) {
-                            
-            try {
-                    connection.sendAdminMessage(new KVAdminMessage(message));
-            } catch (IOException e) {
-                    printError("Unable to send message!");
-                    connection.disconnect();
-                    return;
-            }
-
-        } else {
-            printError("Not connected!");
-            return;
-        }
-    }
+    public void handleStatus(ClientSocketListener.SocketStatus status){}
     
     // INTERFACE
     
@@ -480,7 +876,7 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
                         }
                         ArrayList<String> list = new ArrayList<String>();
                         list.add(tokens[1]);
-                        removeNodes(list);
+                        removeNodes(list, false);
                         break;
                         
                     case "list":
@@ -500,9 +896,13 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
                         }
                         
                         for (Map.Entry<String, IECSNode> entry : nodes.entrySet()) {
+
                             IECSNode _node = entry.getValue();
-                            System.out.print(PROMPT + "Node: " + entry.getKey() + "\t\tHash Range: " + _node.getNodeHashRange()[0] + "-" + _node.getNodeHashRange()[1]);
+                            System.out.print(PROMPT + "Node: " + entry.getValue().getNodeName() +
+									 "\t\tHash Range: " + _node.getNodeHashRange()[0] + "-" + _node.getNodeHashRange()[1]);
+
                             System.out.println("\t\tHost: " + entry.getValue().getNodeHost() + ":" + entry.getValue().getNodePort());
+
                         }
                         
                         break;   
@@ -567,12 +967,8 @@ public class ECSClient implements IECSClient, ClientSocketListener, Watcher {
     
     public static void main(String[] args) {
     	try {
-            new LogSetup("logs/ecs.log", Level.INFO);
-            
-            // Get file from command line arg
-            
-            
-            ECSClient app = new ECSClient();
+            new LogSetup("logs/ecs.log", Level.INFO);            
+            ECSClient app = new ECSClient(args[0]);
             app.nodes = new HashMap<String, IECSNode>();
             app.run();
 		} catch (IOException e) {

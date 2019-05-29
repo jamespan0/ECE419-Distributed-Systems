@@ -29,8 +29,8 @@ public class KVStore extends Thread implements KVCommInterface {
         private static final int BUFFER_SIZE = 1024;
         private static final int DROP_SIZE = 1024 * BUFFER_SIZE;
 
-        private String address;
-        private int port;
+        public String address;
+        public int port;
         /**
          * Initialize KVStore with address and port of KVServer
          * @param address the address of the KVServer
@@ -43,6 +43,14 @@ public class KVStore extends Thread implements KVCommInterface {
         }
 
         @Override public void connect() throws Exception {
+                
+                clientSocket = new Socket(address, port);
+                listeners = new HashSet<ClientSocketListener>();
+                setRunning(true);
+                logger.info("Connection established");
+        }
+
+       	public void connect(String address, int port) throws Exception {
                 
                 clientSocket = new Socket(address, port);
                 listeners = new HashSet<ClientSocketListener>();
@@ -176,13 +184,6 @@ public class KVStore extends Thread implements KVCommInterface {
          * @throws IOException some I/O error regarding the output stream 
          */
         public void sendMessage(TextMessage msg) throws IOException {
-                byte[] msgBytes = msg.getMsgBytes();
-                output.write(msgBytes, 0, msgBytes.length);
-                output.flush();
-                logger.info("Send message:\t '" + msg.getMsg() + "'");
-        }
-
-        public void sendAdminMessage(KVAdminMessage msg) throws IOException {
                 byte[] msgBytes = msg.getMsgBytes();
                 output.write(msgBytes, 0, msgBytes.length);
                 output.flush();
