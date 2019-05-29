@@ -1,6 +1,8 @@
 # ECE419 Distributed Systems Project
 Implementation of key-value pair storage servers using concepts and techniques from distributed systems course.
 
+![alt text](https://i.imgur.com/ZMSKtqJ.png)
+
 ### Milestone 1: 
 Simple single-server storage with client communications. Cache for quicker lookup on storage server.
 
