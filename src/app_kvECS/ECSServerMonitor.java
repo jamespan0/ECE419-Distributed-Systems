@@ -23,79 +23,80 @@ import org.apache.zookeeper.data.*;
 
 import org.json.*;
 
-public class ECSServerMonitor implements Runnable, Watcher  {
-	private static Logger logger = Logger.getRootLogger();
+public class ECSServerMonitor implements Runnable, Watcher {
+    private static Logger logger = Logger.getRootLogger();
 
-	private ECSClient ecs;
+    private ECSClient ecs;
 
-	private static final String ZK_CONNECT = "127.0.0.1:2181";
-	private static final int ZK_TIMEOUT = 2000;
+    private static final String ZK_CONNECT = "127.0.0.1:2181";
+    private static final int ZK_TIMEOUT = 2000;
 
-	public boolean running = false;
+    public boolean running = false;
 
-	private ZooKeeper zk;
-	private CountDownLatch connectedSignal;
+    private ZooKeeper zk;
+    private CountDownLatch connectedSignal;
 
-	public Set<String> testActive = new TreeSet<String>();
-	public Set<String> needResponse = new TreeSet<String>();
+    public Set<String> testActive = new TreeSet<String>();
+    public Set<String> needResponse = new TreeSet<String>();
 
-	public ECSServerMonitor(ECSClient ecs) {
-		this.ecs = ecs;
-	}
+    public ECSServerMonitor(ECSClient ecs) {
+        this.ecs = ecs;
+    }
 
-	public void run() {
-		try {
-			connectedSignal = new CountDownLatch(1);
+    public void run() {
+        try {
+            connectedSignal = new CountDownLatch(1);
 
-			zk = new ZooKeeper(ZK_CONNECT, ZK_TIMEOUT, new Watcher() {
-				@Override
-				public void process(WatchedEvent event) {
-				if (event.getState() == Watcher.Event.KeeperState.SyncConnected) {
-						connectedSignal.countDown();
-					}
-				}
-			});
+            zk = new ZooKeeper(ZK_CONNECT, ZK_TIMEOUT, new Watcher() {
+                @Override
+                public void process(WatchedEvent event) {
+                    if (event.getState() == Watcher.Event.KeeperState.SyncConnected) {
+                        connectedSignal.countDown();
+                    }
+                }
+            });
 
-			//heartbeat every 30s
-			int heartbeat = 30000;
+            //heartbeat every 30s
+            int heartbeat = 30000;
 
-			while(running) {
-				long currentTime = System.currentTimeMillis();
+            while (running) {
+                long currentTime = System.currentTimeMillis();
 
-				for(String failed : needResponse) {
-					ecs.replace(failed);
-					needResponse.remove(failed);
-				}
-		
+                for (String failed : needResponse) {
+                    ecs.replace(failed);
+                    needResponse.remove(failed);
+                }
 
-				if(running){
 
-					for (String server : testActive) {
-						Stat st = zk.exists("/" + server + "/heartbeat", this);
-						if (st == null) {
-							zk.create("/" + server + "/heartbeat", "".getBytes(),
-														ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-							st = zk.exists("/" + server + "/heartbeat", this);
-						} else {
-							zk.setData("/" + server + "/message", "HEARTBEAT".getBytes(), zk.exists("/" + server + "/message", false).getVersion());
+                if (running) {
 
-							needResponse.add(server);
-						}
-					}
-				}
+                    for (String server : testActive) {
+                        Stat st = zk.exists("/" + server + "/heartbeat", this);
+                        if (st == null) {
+                            zk.create("/" + server + "/heartbeat", "".getBytes(),
+                                    ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                            st = zk.exists("/" + server + "/heartbeat", this);
+                        } else {
+                            zk.setData("/" + server + "/message", "HEARTBEAT".getBytes(), zk.exists("/" + server + "/message", false).getVersion());
 
-				//wait heartbeat time
-				while(System.currentTimeMillis() - currentTime < heartbeat && running) {}
-			}
-		} catch (Exception e) {
-			logger.error(e);
-			e.printStackTrace();
-		}
-	}
+                            needResponse.add(server);
+                        }
+                    }
+                }
 
-	@Override
-	public void process(WatchedEvent we) {
-		String server = we.getPath().split("/")[1];
-		needResponse.remove(server);
-	}
+                //wait heartbeat time
+                while (System.currentTimeMillis() - currentTime < heartbeat && running) {
+                }
+            }
+        } catch (Exception e) {
+            logger.error(e);
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void process(WatchedEvent we) {
+        String server = we.getPath().split("/")[1];
+        needResponse.remove(server);
+    }
 }
